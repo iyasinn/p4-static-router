@@ -10,7 +10,8 @@
       "name": "Debug",
       "program": "${workspaceFolder}/build/StaticRouter",
       "args": ["-r", "./rtable"],
-      "cwd": "${workspaceFolder}"
+      "cwd": "${workspaceFolder}",
+      "preLaunchTask": "build"
     }
   ]
 }
