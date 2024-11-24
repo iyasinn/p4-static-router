@@ -1,0 +1,1 @@
+ssh -i ~/.ssh/eecs489-key-pair.pem -R 6633:localhost:6633 ubuntu@ec2-54-147-130-125.compute-1.amazonaws.com
