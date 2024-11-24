@@ -1,6 +1,7 @@
 #include "StaticRouter.h"
 
 #include <_types/_uint16_t.h>
+#include <_types/_uint8_t.h>
 #include <cstring>
 #include <spdlog/spdlog.h>
 
@@ -43,7 +44,30 @@ void StaticRouter::handlePacket(std::vector<uint8_t> packet,
 
   if (type == sr_ethertype::ethertype_ip) {
 
+    sr_ip_hdr_t *ipr =
+        (sr_ip_hdr_t *)(packet.data() + sizeof(sr_ethernet_hdr_t));
+
+    print_hdr_ip((uint8_t *)(ipr));
+
+    //
+
+    /*
+
+      Need to see if the chcksum is right
+    */
+
   } else if (type == sr_ethertype::ethertype_arp) {
+
+    sr_arp_hdr_t arp =
+        (sr_arp_hdr_t *)(packet.data() + sizeof(sr_ethernet_hdr_t));
+    int arp_type = arp->
+                   /*
+
+                   Needc to get ARP working
+
+
+                   */
+                   print_hdr_arp()
   }
 
   // auto mac_addr = make_mac_addr(ethr->ether_dhost);
