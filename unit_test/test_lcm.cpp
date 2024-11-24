@@ -13,7 +13,7 @@ struct Result {
   uint32_t dst;
 };
 
-Result lcmIl(vector<uint32_t> &entries, uint32_t ip) {
+Result lcm(vector<uint32_t> &entries, uint32_t ip) {
   uint32_t allOnes = 0xFFFFFFFF;
   int mask_size = 24;
   uint32_t mask = allOnes << 8;
@@ -26,8 +26,12 @@ Result lcmIl(vector<uint32_t> &entries, uint32_t ip) {
     uint32_t masked_dest_addr = ip & mask;
 
     int count = 0;
-    for (int i = 0; i < mask_size; i++) {
+    for (int i = 0; i < 32; i++) {
       int shift = (31 - i);
+
+      if (((mask >> shift) & 1) == 0) {
+        break;
+      }
 
       if (((masked_entry_addr >> shift) & 1) ==
           ((masked_dest_addr >> shift) & 1)) {
@@ -36,6 +40,7 @@ Result lcmIl(vector<uint32_t> &entries, uint32_t ip) {
         break;
       }
     }
+    std::cout << std::endl;
 
     if (count > LCM_size) {
       LCM_size = count;
@@ -50,7 +55,7 @@ Result lcmIl(vector<uint32_t> &entries, uint32_t ip) {
   return result;
 }
 
-Result lcm(vector<uint32_t> &entries, uint32_t ip) {
+Result lcmStringMethod(vector<uint32_t> &entries, uint32_t ip) {
   uint32_t allOnes = 0xFFFFFFFF;
   int mask_size = 24;
   uint32_t mask = allOnes << 8;
