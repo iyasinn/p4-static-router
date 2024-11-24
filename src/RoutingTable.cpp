@@ -56,7 +56,7 @@ std::optional<RoutingEntry> RoutingTable::getRoutingEntry(ip_addr ip) {
 
     for (int i = 0; i < entry.mask; i++) {
       int shift = (31 - i);
-      if (((masked_entry_addr >> shift) & (masked_dest_addr >> shift)) == 1) {
+      if (((masked_entry_addr >> shift) & (masked_dest_addr >> shift)) == 0) {
         count += 1;
       } else {
         break;
