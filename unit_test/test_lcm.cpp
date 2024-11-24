@@ -1,5 +1,6 @@
 #include <_types/_uint32_t.h>
 #include <arpa/inet.h>
+#include <bitset>
 #include <fstream>
 #include <iostream>
 #include <sstream>
@@ -12,7 +13,7 @@ struct Result {
   uint32_t dst;
 };
 
-Result lcm(vector<uint32_t> &entries, uint32_t ip) {
+Result lcmIl(vector<uint32_t> &entries, uint32_t ip) {
   uint32_t allOnes = 0xFFFFFFFF;
   int mask_size = 24;
   uint32_t mask = allOnes << 8;
@@ -44,6 +45,40 @@ Result lcm(vector<uint32_t> &entries, uint32_t ip) {
 
   Result result;
   result.dst = dest_answer;
+  result.count = LCM_size;
+
+  return result;
+}
+
+Result lcm(vector<uint32_t> &entries, uint32_t ip) {
+  uint32_t allOnes = 0xFFFFFFFF;
+  int mask_size = 24;
+  uint32_t mask = allOnes << 8;
+
+  string dest_answer;
+  int LCM_size = 0;
+
+  for (auto entry : entries) {
+    string masked_entry_str = bitset<32>(entry & mask).to_string();
+    string masked_dest_str = bitset<32>(ip & mask).to_string();
+
+    int count = 0;
+    for (int i = 0; i < mask_size; i++) {
+      if (masked_entry_str[i] == masked_dest_str[i]) {
+        count += 1;
+      } else {
+        break;
+      }
+    }
+
+    if (count > LCM_size) {
+      LCM_size = count;
+      dest_answer = masked_entry_str;
+    }
+  }
+
+  Result result;
+  result.dst = bitset<32>(dest_answer).to_ulong();
   result.count = LCM_size;
 
   return result;
