@@ -14,7 +14,7 @@ int main(int argc, char **argv) {
   auto result = options.parse(argc, argv);
 
   std::cout << "Starting router\n\n";
-  std::cout << "Cool\n";
+
   BridgeClient client(result["routing-table"].as<std::string>(),
                       result["pcap-prefix"].as<std::string>());
   client.run();
