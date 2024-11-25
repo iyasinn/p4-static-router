@@ -57,17 +57,18 @@ void StaticRouter::handlePacket(std::vector<uint8_t> packet,
     */
 
   } else if (type == sr_ethertype::ethertype_arp) {
-
-    sr_arp_hdr_t arp =
+    sr_arp_hdr_t *arp =
         (sr_arp_hdr_t *)(packet.data() + sizeof(sr_ethernet_hdr_t));
-    int arp_type = arp->
-                   /*
 
-                   Needc to get ARP working
+    print_hdr_arp((uint8_t *)(arp));
 
+    // Extract the ARP operation type
+    uint16_t arp_type = ntohs(arp->ar_op);
 
-                   */
-                   print_hdr_arp()
+    // Log or process the ARP type as needed
+    spdlog::info("ARP operation type: {}", arp_type);
+
+    // You can add any additional logic here if needed
   }
 
   // auto mac_addr = make_mac_addr(ethr->ether_dhost);

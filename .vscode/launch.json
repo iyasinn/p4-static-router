@@ -5,6 +5,18 @@
   "version": "0.2.0",
   "configurations": [
     {
+      "name": "unit test a.out",
+      "type": "cppdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}/unit_test/a.out",
+      "args": [],
+      "stopAtEntry": false,
+      "cwd": "${fileDirname}",
+      "environment": [],
+      "externalConsole": false,
+      "MIMode": "lldb"
+    },
+    {
       "type": "lldb",
       "request": "launch",
       "name": "Debug",

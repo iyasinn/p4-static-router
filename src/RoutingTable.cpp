@@ -52,24 +52,32 @@ std::optional<RoutingEntry> RoutingTable::getRoutingEntry(ip_addr ip) {
     uint32_t masked_entry_addr = entry.dest & entry.mask;
     uint32_t masked_dest_addr = ip & entry.mask;
 
-    int count = 0;
+    int length = 0;
 
-    for (int i = 0; i < entry.mask; i++) {
+    for (int i = 0; i < 32; i++) {
+
       int shift = (31 - i);
-      if (((masked_entry_addr >> shift) & (masked_dest_addr >> shift)) == 0) {
-        count += 1;
-      } else {
+
+      // Reached the end of the msak
+      if (((entry.mask >> shift) & 1) == 0) {
         break;
       }
+
+      // If bits match
+      if (((masked_entry_addr >> shift) & 1) !=
+          ((masked_dest_addr >> shift) & 1)) {
+        break;
+      }
+
+      length += 1;
     }
 
-    if (count > LCM_size) {
-      LCM_size = count;
+    if (length > LCM_size) {
+      LCM_size = length;
       LCM_routing_entry = entry;
     }
   }
 
-  // Todo: Do we return nothing if LCM_size == 0?
   return LCM_size == 0 ? std::nullopt
                        : std::optional<RoutingEntry>(LCM_routing_entry);
 }
