@@ -14,10 +14,13 @@ struct Result {
 };
 
 Result lcm(vector<uint32_t> &entries, uint32_t ip) {
+
+  /* Make a mask*/
   uint32_t allOnes = 0xFFFFFFFF;
   int mask_size = 24;
   uint32_t mask = allOnes << 8;
 
+  // 11111111110000
   uint32_t dest_answer = 0;
   int LCM_size = 0;
 
@@ -26,8 +29,9 @@ Result lcm(vector<uint32_t> &entries, uint32_t ip) {
     uint32_t masked_dest_addr = ip & mask;
 
     int count = 0;
+
     for (int i = 0; i < 32; i++) {
-      int shift = (31 - i);
+      int shift = (31 - i); // index we look at
 
       if (((mask >> shift) & 1) == 0) {
         break;
@@ -40,7 +44,6 @@ Result lcm(vector<uint32_t> &entries, uint32_t ip) {
         break;
       }
     }
-    std::cout << std::endl;
 
     if (count > LCM_size) {
       LCM_size = count;

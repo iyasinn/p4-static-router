@@ -37,7 +37,6 @@ void StaticRouter::handlePacket(std::vector<uint8_t> packet,
   // sizeof(sr_ethernet_hdr_t));
 
   print_hdr_eth(packet.data());
-
   auto dst_addr = make_mac_addr(ethr->ether_dhost);
   auto src_addr = make_mac_addr(ethr->ether_shost);
   uint16_t type = ntohs(ethr->ether_type);
@@ -49,14 +48,8 @@ void StaticRouter::handlePacket(std::vector<uint8_t> packet,
 
     print_hdr_ip((uint8_t *)(ipr));
 
-    //
-
-    /*
-
-      Need to see if the chcksum is right
-    */
-
   } else if (type == sr_ethertype::ethertype_arp) {
+
     sr_arp_hdr_t *arp =
         (sr_arp_hdr_t *)(packet.data() + sizeof(sr_ethernet_hdr_t));
 
@@ -67,38 +60,37 @@ void StaticRouter::handlePacket(std::vector<uint8_t> packet,
 
     // Log or process the ARP type as needed
     spdlog::info("ARP operation type: {}", arp_type);
-
-    // You can add any additional logic here if needed
   }
 
-  // auto mac_addr = make_mac_addr(ethr->ether_dhost);
-  //   for (int i = 0; i < mac_addr.size(); i++) {
-  //     std::cout << std::hex << (int)mac_addr[i] << ":";
-  //   }
-
-  /*
-    So we have just received a packet on an interface
-    We need to figure out what to do with it.
-
-    - Lets focus on Packet Validiation first
-        - Check if the packet is valid using the checksum
-        - If the TTL is 0, we just drop it
-
-
-    - Decrement TTL by 1 somewhere
-
-
-    - ARP stuff to deterimine where ot send it if we need to send it
-    - Decrement TTL
-    - Determine if we need to forward the packet or if it is destined for this
-  machine
-
-    - ARP stuff to deterimine where ot send it if we need to send it
-
-
-  Questions:
-  - DO we decrement TTL If we are the destination?
-
-
-  */
+  return;
 }
+// auto mac_addr = make_mac_addr(ethr->ether_dhost);
+//   for (int i = 0; i < mac_addr.size(); i++) {
+//     std::cout << std::hex << (int)mac_addr[i] << ":";
+//   }
+
+/*
+  So we have just received a packet on an interface
+  We need to figure out what to do with it.
+
+  - Lets focus on Packet Validiation first
+      - Check if the packet is valid using the checksum
+      - If the TTL is 0, we just drop it
+
+
+  - Decrement TTL by 1 somewhere
+
+
+  - ARP stuff to deterimine where ot send it if we need to send it
+  - Decrement TTL
+  - Determine if we need to forward the packet or if it is destined for this
+machine
+
+  - ARP stuff to deterimine where ot send it if we need to send it
+
+
+Questions:
+- DO we decrement TTL If we are the destination?
+
+
+*/
