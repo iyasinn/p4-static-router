@@ -11,7 +11,7 @@ scp -i ~/.ssh/eecs489-key-pair.pem ~/.ssh/id_ed25519.pub ubuntu@ec2-54-172-250-2
 
 🔵 AWS Commands
 # Replace the ipv4 address below with AWS ipv4 address
-export AWS_IP="ec2-3-85-84-212.compute-1.amazonaws.com" 
+export AWS_IP="ec2-54-167-16-202.compute-1.amazonaws.com" 
 ssh -i ~/.ssh/eecs489-key-pair.pem -R 6633:localhost:6633 ubuntu@$AWS_IP
 ./run_mininet.sh
 

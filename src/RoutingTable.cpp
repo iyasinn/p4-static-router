@@ -1,7 +1,8 @@
 #include "RoutingTable.h"
 #include "IRoutingTable.h"
 
-#include <_types/_uint32_t.h>
+#include <cstdint>
+// ##include <_types/_uint32_t.h>  // Remvoed because it is causing issues
 #include <arpa/inet.h>
 #include <fstream>
 #include <optional>

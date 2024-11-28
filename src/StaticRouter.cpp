@@ -1,7 +1,8 @@
 #include "StaticRouter.h"
 
-#include <_types/_uint16_t.h>
-#include <_types/_uint8_t.h>
+#include <cstdint>
+// #include <_types/_uint16_t.h>
+// #include <_types/_uint8_t.h>
 #include <cstring>
 #include <spdlog/spdlog.h>
 
@@ -42,7 +43,7 @@ void StaticRouter::handlePacket(std::vector<uint8_t> packet,
     ARP_Packet_Header &arp = eth.arp;
     print_hdr_arp((uint8_t *)arp._arp_packet);
     std::cout << "\n";
-    arp.print_header();
+    // arp.print_header();
   }
 
   // if (packet_type == sr_ethertype::ethertype_ip) {

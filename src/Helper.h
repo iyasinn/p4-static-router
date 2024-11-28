@@ -1,8 +1,7 @@
 #include "protocol.h"
 #include "spdlog/spdlog.h"
-#include "util.h"
 #include "utils.h"
-#include <_types/_uint8_t.h>
+// #include <_types/_uint8_t.h>
 #include <cstdint>
 #include <iostream>
 #include <vector>
@@ -45,22 +44,22 @@ public:
     _arp_packet->ar_tip = htonl(_arp_packet->ar_tip);
   }
 
-  void print_header() {
-    spdlog::info("ARP header");
-    spdlog::info("\thardware type: {}", (_arp_packet->ar_hrd));
-    spdlog::info("\tprotocol type: {}", (_arp_packet->ar_pro));
-    spdlog::info("\thardware address length: {}", _arp_packet->ar_hln);
-    spdlog::info("\tprotocol address length: {}", _arp_packet->ar_pln);
-    spdlog::info("\topcode: {}", (_arp_packet->ar_op));
-    spdlog::info("\tsender hardware address: ");
-    print_addr_eth(_arp_packet->ar_sha);
-    spdlog::info("\tsender ip address: ");
-    print_addr_ip_int((_arp_packet->ar_sip));
-    spdlog::info("\ttarget hardware address: ");
-    print_addr_eth(_arp_packet->ar_tha);
-    spdlog::info("\ttarget ip address: ");
-    print_addr_ip_int((_arp_packet->ar_tip));
-  }
+  // void print_header() {
+  //   spdlog::info("ARP header");
+  //   spdlog::info("\thardware type: {}", _arp_packet->ar_hrd);
+  //   spdlog::info("\tprotocol type: {}", _arp_packet->ar_pro);
+  //   spdlog::info("\thardware address length: {}", _arp_packet->ar_hln);
+  //   spdlog::info("\tprotocol address length: {}", _arp_packet->ar_pln);
+  //   spdlog::info("\topcode: {}", _arp_packet->ar_op);
+  //   spdlog::info("\tsender hardware address: ");
+  //   print_addr_eth(_arp_packet->ar_sha);
+  //   spdlog::info("\tsender ip address: ");
+  //   print_addr_ip_int(_arp_packet->ar_sip);
+  //   spdlog::info("\ttarget hardware address: ");
+  //   print_addr_eth(_arp_packet->ar_tha);
+  //   spdlog::info("\ttarget ip address: ");
+  //   print_addr_ip_int(_arp_packet->ar_tip);
+  // }
 
   const sr_arp_hdr_t &packet() { return *_arp_packet; }
 
@@ -95,31 +94,31 @@ public:
     _ip_packet->ip_dst = htonl(_ip_packet->ip_dst); // Destination IP address
   }
 
-  void print_header() {
-    // sr_ip_hdr_t *iphdr = (sr_ip_hdr_t *)(buf);
-    spdlog::info("IP header:");
-    spdlog::info("\tversion: {}", static_cast<int>(_ip_packet->ip_v));
-    spdlog::info("\theader length: {}", static_cast<int>(_ip_packet->ip_hl));
-    spdlog::info("\ttype of service: {}", _ip_packet->ip_tos);
-    spdlog::info("\tlength: {}", (_ip_packet->ip_len));
-    spdlog::info("\tid: {}", (_ip_packet->ip_id));
+  // void print_header() {
+  //   // sr_ip_hdr_t *iphdr = (sr_ip_hdr_t *)(buf);
+  //   spdlog::info("IP header:");
+  //   spdlog::info("\tversion: {}", static_cast<int>(_ip_packet->ip_v));
+  //   spdlog::info("\theader length: {}", static_cast<int>(_ip_packet->ip_hl));
+  //   spdlog::info("\ttype of service: {}", _ip_packet->ip_tos);
+  //   spdlog::info("\tlength: {}", (_ip_packet->ip_len));
+  //   spdlog::info("\tid: {}", (_ip_packet->ip_id));
 
-    if (ntohs(_ip_packet->ip_off) & IP_DF)
-      spdlog::info("\tfragment flag: DF");
-    else if ((_ip_packet->ip_off) & IP_MF)
-      spdlog::info("\tfragment flag: MF");
-    else if ((_ip_packet->ip_off) & IP_RF)
-      spdlog::info("\tfragment flag: R");
+  //   if (ntohs(_ip_packet->ip_off) & IP_DF)
+  //     spdlog::info("\tfragment flag: DF");
+  //   else if ((_ip_packet->ip_off) & IP_MF)
+  //     spdlog::info("\tfragment flag: MF");
+  //   else if ((_ip_packet->ip_off) & IP_RF)
+  //     spdlog::info("\tfragment flag: R");
 
-    spdlog::info("\tfragment offset: {}", (_ip_packet->ip_off) & IP_OFFMASK);
-    spdlog::info("\tTTL: {}", _ip_packet->ip_ttl);
-    spdlog::info("\tprotocol: {}", _ip_packet->ip_p);
-    spdlog::info("\tchecksum: {}", static_cast<uint32_t>(_ip_packet->ip_sum));
-    spdlog::info("\tsource: ");
-    print_addr_ip_int((_ip_packet->ip_src));
-    spdlog::info("\tdestination: ");
-    print_addr_ip_int((_ip_packet->ip_dst));
-  }
+  //   spdlog::info("\tfragment offset: {}", (_ip_packet->ip_off) & IP_OFFMASK);
+  //   spdlog::info("\tTTL: {}", _ip_packet->ip_ttl);
+  //   spdlog::info("\tprotocol: {}", _ip_packet->ip_p);
+  //   spdlog::info("\tchecksum: {}", static_cast<uint32_t>(_ip_packet->ip_sum));
+  //   spdlog::info("\tsource: ");
+  //   print_addr_ip_int((_ip_packet->ip_src));
+  //   spdlog::info("\tdestination: ");
+  //   print_addr_ip_int((_ip_packet->ip_dst));
+  // }
 
   const sr_ip_hdr_t &packet() const { return *_ip_packet; }
 
