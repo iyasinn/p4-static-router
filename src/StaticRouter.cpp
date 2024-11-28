@@ -3,22 +3,24 @@
 #include <cstdint>
 // #include <_types/_uint16_t.h>
 // #include <_types/_uint8_t.h>
-#include <cstring>
 #include <spdlog/spdlog.h>
+
+#include <cstring>
+#include <iostream>
 
 #include "protocol.h"
 #include "utils.h"
 
-#include <iostream>
-
 // Our libraries
-#include "Helper.h"
 #include <string>
+
+#include "Helper.h"
 
 StaticRouter::StaticRouter(std::unique_ptr<IArpCache> arpCache,
                            std::shared_ptr<IRoutingTable> routingTable,
                            std::shared_ptr<IPacketSender> packetSender)
-    : routingTable(routingTable), packetSender(packetSender),
+    : routingTable(routingTable),
+      packetSender(packetSender),
       arpCache(std::move(arpCache)) {}
 
 void StaticRouter::handlePacket(std::vector<uint8_t> packet,
@@ -44,39 +46,51 @@ void StaticRouter::handlePacket(std::vector<uint8_t> packet,
     print_hdr_arp((uint8_t *)arp._arp_packet);
     std::cout << "\n";
     // arp.print_header();
+  } else if (eth.get_type() == sr_ethertype::ethertype_ip) {
+    eth.convert_to_host_order();  // ! implicitly call this in ETH_Packet ctor?
+                                  // ! @iyasin
+    IP_Packet_Header &ip = eth.ip;
+    print_hdr_ip((uint8_t *)&ip.packet());
+
+    /*
+      TODO:
+        overall, need to validate when to convert to network byte order
+        and make finish some small things like creating the final ethernet
+        packet after getting response from ARP cache, etc
+
+        also need to make sure the ICMP stuff is working properly
+        ! cant test bc ping repeatedly sends ARP requests, will never send IP
+        ! until ARP request is resolved
+     */
+    try {
+      ip.validate_checksum();
+      ip.decr_ttl();
+      auto routing_entry = routingTable->getRoutingEntry(ip.get_ip_dst());
+      if (!routing_entry) {
+        throw ICMPException(Type::T3,
+                            Code::NetUnreachable);  // ! i think its this code?
+      }
+      auto arp_entry = arpCache->getEntry(routing_entry->dest);
+      if (!arp_entry) {
+        // Otherwise, send an ARP request for the next-hop IP (if one hasn't
+        // been sent within the last second), and add the packet to the queue of
+        // packets waiting on this ARP request.
+      }
+
+      ip.prepare_for_send();
+      // init ethernet header, pass below
+      // eth.set_eth_header() // ! this function is defined, but havent tested
+      // TODO: stick ip packet back in eth frame body
+      // ! ETH_Packet::to_packet() not impld
+      packetSender->sendPacket(eth.to_packet(), routing_entry->iface);
+
+    } catch (const ICMPException &e) {
+      ICMP_Packet icmp = ICMP_Packet(e);
+      icmp.prepare_for_send();
+      // send back on iface which we received packet from
+      packetSender->sendPacket(icmp.to_packet(), iface);
+    }
   }
-
-  // if (packet_type == sr_ethertype::ethertype_ip) {
-
-  //   sr_ip_hdr_t *ipr =
-  //       (sr_ip_hdr_t *)(packet.data() + sizeof(sr_ethernet_hdr_t));
-
-  //   print_hdr_ip((uint8_t *)(ipr));
-
-  //   std::cout << "HAVE NOT IMPLEMENTED THIS YET\n";
-
-  // } else if (packet_type == sr_ethertype::ethertype_arp) {
-
-  //   sr_arp_hdr_t *arp =
-  //       (sr_arp_hdr_t *)(packet.data() + sizeof(sr_ethernet_hdr_t));
-
-  //   ARP_Packet_Header arp_header(arp);
-
-  //   print_hdr_arp((uint8_t *)&(arp_header.packet()));
-
-  //   arp_header.convert_to_host_order();
-
-  //   print_hdr_arp((uint8_t *)&(arp_header.packet()));
-
-  //   // Extract the ARP operation type
-  //   uint16_t arp_type = ntohs(arp->ar_op);
-
-  //   // Log or process the ARP type as needed
-  //   spdlog::info("ARP operation type: {}", arp_type);
-
-  //   ETH_Packet eth(packet);
-  // }
-
   return;
 }
 // auto mac_addr = make_mac_addr(ethr->ether_dhost);
