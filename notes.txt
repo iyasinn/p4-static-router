@@ -11,7 +11,7 @@ scp -i ~/.ssh/eecs489-key-pair.pem ~/.ssh/id_ed25519.pub ubuntu@ec2-54-172-250-2
 
 🔵 AWS Commands
 # Replace the ipv4 address below with AWS ipv4 address
-export AWS_IP="ec2-3-80-23-192.compute-1.amazonaws.com" 
+export AWS_IP="ec2-3-85-84-212.compute-1.amazonaws.com" 
 ssh -i ~/.ssh/eecs489-key-pair.pem -R 6633:localhost:6633 ubuntu@$AWS_IP
 ./run_mininet.sh
 
@@ -26,4 +26,107 @@ Depends on which directory we call it from
 
 🔵 Emulating Pings
 client ping -c 4 server2
+
+------------------------------
+
+
+
+
+  data link etherent inside a LAN
+  etherenet (mac addresses and a src mac and a target)
+
+  ip is already defined -> DHCP
+
+  now we need macs -> ARP -> taeks the ip u want, and gives u the mac addres of
+that ip Or to get that ip eventually, the next mac address you need
+  ---
+  ARP Protocol - Request
+  Header: (src ip, src mac, target ip, target mac, type)
+  wrap this in ehteret: we set hte src mac to src mac, and we set the target BROADCAST - ff-ff-ff-ff-ff-ff and this jmeans it go to every1
+
+  type == Request: (src ip, src mac, target ip, traget_mac=BLANK)
+
+  receive the arp. When we receive it, we check: are we the target ip? If we are the target IP, then genereate hte reply
+  type == reply:
+  (src ip, src mac, target ip, target_mac=BLANK)
+  (target_ip, target_map, source_ip, source_mac)
+
+  LAN only or on (LAN for point to point)
+  we dont have to worry about forwaridng or makng it go to the right 
+
+  Router: Has to handl ereceive a request an sending reply -> goal is that people can find us now they have our mac
+      Has to handle generating a request and receive a reply -> so that we can find other ppl we need (their macs)
+
+
+
+  Receive a request: 
+
+  ip request it might not be able to go somehwre because waiting on the mac address to come from ARP 
+
+  
+    Receive arp 
+      Check if its a reqeust 
+        Is it for one of our interface (we have their ips)
+            for each interface i
+                is get_ip(i) == arp->target_ip
+                 if it is, then genreate a arp reply and send it back to the interaface we received the request on 
+    
+        If it is a reply for us: 
+            Is the target_ip == to one of our interface ips (so is it a response to the interface)
+            And if it is, then update our cache becaue that means that it was meant for us (this should nto happen)
+            ARP Cache: ip->mac 
+            TTL stuf, baqwas 
+
+            Queue of stuff waiting for the mac addresses. So we probably have to do something there too, Like for everything who gets the
+            ip -> mac mapping it needed, we should now send that stuff
+
+
+
+
+
+
+
+
+
+
+
+Gateway: point to piont layer
+
+ethernet
+  LAN
+
+  bots
+
+      requests
+        static router         gives you the func: ip -> mac address
+                                arp cache -> arp protocol on the same as level
+as ip
+
+
+          get you the next hop ip
+        routing table
+
+
+  ARP contains
+  - type: request or reply
+  - src
+    - ip and mac
+  - target
+    - ip and mac
+
+  --------------------------
+
+  Okay, lets chart a path
+
+  Request
+    src ip and src mac is given
+    trgt ip is given, target mac empty
+
+    When we get this, assuming our ip is what they want
+
+
+  for request, contain src ip and mac, and a target ip, but no mac
+  for reply, contain src ip and mac with reply, and tries to hit ip and mac
+
+
 

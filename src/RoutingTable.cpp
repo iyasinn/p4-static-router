@@ -4,6 +4,7 @@
 #include <_types/_uint32_t.h>
 #include <arpa/inet.h>
 #include <fstream>
+#include <optional>
 #include <spdlog/spdlog.h>
 #include <sstream>
 
@@ -44,42 +45,22 @@ RoutingTable::RoutingTable(const std::filesystem::path &routingTablePath) {
 
 std::optional<RoutingEntry> RoutingTable::getRoutingEntry(ip_addr ip) {
 
-  RoutingEntry LCM_routing_entry = routingEntries[0];
+  std::optional<RoutingEntry> LCM_routing_entry = std::nullopt;
   int LCM_size = 0;
 
   for (RoutingEntry entry : routingEntries) {
 
-    uint32_t masked_entry_addr = entry.dest & entry.mask;
+    uint32_t masked_ip_addr = entry.dest & entry.mask;
     uint32_t masked_dest_addr = ip & entry.mask;
+    int num_one_in_mask = __builtin_popcount(entry.mask);
 
-    int length = 0;
-
-    for (int i = 0; i < 32; i++) {
-
-      int shift = (31 - i);
-
-      // Reached the end of the msak
-      if (((entry.mask >> shift) & 1) == 0) {
-        break;
-      }
-
-      // If bits match
-      if (((masked_entry_addr >> shift) & 1) !=
-          ((masked_dest_addr >> shift) & 1)) {
-        break;
-      }
-
-      length += 1;
-    }
-
-    if (length > LCM_size) {
-      LCM_size = length;
+    if ((masked_dest_addr == masked_ip_addr) && (num_one_in_mask > LCM_size)) {
+      LCM_size = num_one_in_mask;
       LCM_routing_entry = entry;
     }
   }
 
-  return LCM_size == 0 ? std::nullopt
-                       : std::optional<RoutingEntry>(LCM_routing_entry);
+  return LCM_routing_entry;
 }
 
 RoutingInterface RoutingTable::getRoutingInterface(const std::string &iface) {
