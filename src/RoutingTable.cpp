@@ -47,7 +47,7 @@ RoutingTable::RoutingTable(const std::filesystem::path &routingTablePath) {
 std::optional<RoutingEntry> RoutingTable::getRoutingEntry(ip_addr ip) {
 
   std::optional<RoutingEntry> LCM_routing_entry = std::nullopt;
-  int LCM_size = 0;
+  int LCM_size = -1;
 
   for (RoutingEntry entry : routingEntries) {
 

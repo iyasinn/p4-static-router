@@ -11,7 +11,7 @@ ec2-34-229-121-36.compute-1.amazonaws.com
 
 🔵 AWS Commands
 # Replace the ipv4 address below with AWS ipv4 address
-export AWS_IP="ec2-34-229-121-36.compute-1.amazonaws.com" 
+export AWS_IP="ec2-54-175-240-118.compute-1.amazonaws.com" 
 ssh -i ~/.ssh/eecs489-key-pair.pem -R 6633:localhost:6633 ubuntu@$AWS_IP
 ./run_mininet.sh
 

@@ -50,16 +50,16 @@ void StaticRouter::handlePacket(std::vector<uint8_t> packet,
       return;
     }
 
-    // auto interface = getRoutingInterfaceWithIp(arp.get_target_ip());
-    auto interface = getRoutingInterfaceWithIp(arp.header().ar_tip);
+    auto interface = routingTable->getRoutingInterface(iface);
 
-    if (interface == std::nullopt) {
+    if (interface.ip != arp.header().ar_tip) {
       spdlog::info("ARP packet not destined for us");
       return;
     }
 
-    arp.convert_to_reply(interface->ip, interface->mac);
-    eth.update_header_data(interface->mac, arp.get_target_mac(), sr_ethertype::ethertype_arp);
+    arp.convert_to_reply(interface.ip, interface.mac);
+    eth.update_header_data(interface.mac, arp.get_target_mac(),
+                           sr_ethertype::ethertype_arp);
 
     eth.print_header();
     arp.print_header();
