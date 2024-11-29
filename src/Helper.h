@@ -1,9 +1,11 @@
+#include "RouterTypes.h"
 #include "protocol.h"
 #include "spdlog/spdlog.h"
 #include "utils.h"
 // #include <_types/_uint8_t.h>
 #include <cstdint>
 #include <iostream>
+#include <iterator>
 #include <vector>
 
 // bool ip_checksum_valid(sr_ip_hdr_t *ip) {
@@ -22,11 +24,13 @@
 //   virtual void convert_to_network_order() = 0;
 // };
 
-class ARP_Packet_Header {
+class ArpPacketHeader {
 public:
-  ARP_Packet_Header() {}
-  ARP_Packet_Header(sr_arp_hdr_t *const raw_network_data)
-      : _arp_packet(raw_network_data) {}
+  ArpPacketHeader() {}
+  ArpPacketHeader(Packet &raw_eth_packet) {
+    _arp_packet =
+        (sr_arp_hdr_t *)(raw_eth_packet.data() + sizeof(sr_ethernet_hdr_t));
+  }
 
   void convert_to_host_order() {
     _arp_packet->ar_hrd = ntohs(_arp_packet->ar_hrd);
@@ -44,28 +48,49 @@ public:
     _arp_packet->ar_tip = htonl(_arp_packet->ar_tip);
   }
 
-  // void print_header() {
-  //   spdlog::info("ARP header");
-  //   spdlog::info("\thardware type: {}", _arp_packet->ar_hrd);
-  //   spdlog::info("\tprotocol type: {}", _arp_packet->ar_pro);
-  //   spdlog::info("\thardware address length: {}", _arp_packet->ar_hln);
-  //   spdlog::info("\tprotocol address length: {}", _arp_packet->ar_pln);
-  //   spdlog::info("\topcode: {}", _arp_packet->ar_op);
-  //   spdlog::info("\tsender hardware address: ");
-  //   print_addr_eth(_arp_packet->ar_sha);
-  //   spdlog::info("\tsender ip address: ");
-  //   print_addr_ip_int(_arp_packet->ar_sip);
-  //   spdlog::info("\ttarget hardware address: ");
-  //   print_addr_eth(_arp_packet->ar_tha);
-  //   spdlog::info("\ttarget ip address: ");
-  //   print_addr_ip_int(_arp_packet->ar_tip);
-  // }
+  ip_addr get_target_ip(){
+    return ntohl(_arp_packet->ar_tip);
+  }
 
-  const sr_arp_hdr_t &packet() { return *_arp_packet; }
+  unsigned short get_type(){
+    return ntohs(_arp_packet->ar_op);
+  }
 
-  sr_arp_hdr_t *_arp_packet = nullptr;
+  void print_header(){
+    std::cout << std::endl;
+    print_hdr_arp((uint8_t *)&_arp_packet);
+  }
+
+  mac_addr get_sender_mac(){
+    return make_mac_addr(_arp_packet->ar_sha);
+  }
+
+  mac_addr get_target_mac(){
+    return make_mac_addr(_arp_packet->ar_tha);
+  }
+
+
+  // Converst the ARP packet to a reply packet
+  // Assertion: We have a valid Request packet
+  void convert_to_reply(uint32_t new_sender_ip, mac_addr new_sender_mac_addr){
+
+    header().ar_op = htons(sr_arp_opcode::arp_op_reply);
+
+    // Update Target to be our Sender
+    header().ar_tip = header().ar_sip; 
+    memcpy(header().ar_tha, header().ar_sha, ETHER_ADDR_LEN);
+
+    // Update Sender 
+    header().ar_sip = new_sender_ip;
+    memcpy(header().ar_sha, new_sender_mac_addr.data(), ETHER_ADDR_LEN);
+
+  }
+
+
+  sr_arp_hdr_t &header() { return *_arp_packet; }
 
 private:
+  sr_arp_hdr_t *_arp_packet = nullptr;
 };
 
 class IP_Packet_Header {
@@ -113,8 +138,8 @@ public:
   //   spdlog::info("\tfragment offset: {}", (_ip_packet->ip_off) & IP_OFFMASK);
   //   spdlog::info("\tTTL: {}", _ip_packet->ip_ttl);
   //   spdlog::info("\tprotocol: {}", _ip_packet->ip_p);
-  //   spdlog::info("\tchecksum: {}", static_cast<uint32_t>(_ip_packet->ip_sum));
-  //   spdlog::info("\tsource: ");
+  //   spdlog::info("\tchecksum: {}",
+  //   static_cast<uint32_t>(_ip_packet->ip_sum)); spdlog::info("\tsource: ");
   //   print_addr_ip_int((_ip_packet->ip_src));
   //   spdlog::info("\tdestination: ");
   //   print_addr_ip_int((_ip_packet->ip_dst));
@@ -126,66 +151,39 @@ private:
   sr_ip_hdr_t *_ip_packet = nullptr;
 };
 
-class ETH_Packet {
+class EthPacketHeader {
 public:
-  ETH_Packet(const std::vector<uint8_t> &raw_network_data)
-      : _eth_packet(raw_network_data) {
+  EthPacketHeader(std::vector<uint8_t> &raw_network_data)
+      : packet_ref(raw_network_data) {
+
     if (raw_network_data.size() < sizeof(sr_ethernet_hdr_t)) {
       std::cerr << "Error: <data> does not contain enough bytes for an "
                    "ethernet packet\n";
       exit(1);
     }
-    _eth_header = (sr_ethernet_hdr_t *)_eth_packet.data();
 
+    _eth_header = (sr_ethernet_hdr_t *)raw_network_data.data();
     data_type = ntohs(_eth_header->ether_type);
-
-    if (data_type == sr_ethertype::ethertype_arp) {
-      sr_arp_hdr_t *arp_header =
-          (sr_arp_hdr_t *)(_eth_packet.data() + sizeof(sr_ethernet_hdr_t));
-      arp = ARP_Packet_Header(arp_header);
-    } else if (data_type == sr_ethertype::ethertype_ip) {
-      sr_ip_hdr_t *ip_header =
-          (sr_ip_hdr_t *)(_eth_packet.data() + sizeof(sr_ethernet_hdr_t));
-      ip = IP_Packet_Header(ip_header);
-    }
-  }
-
-  void convert_to_host_order() {
-    if (data_type == sr_ethertype::ethertype_arp) {
-      arp.convert_to_host_order();
-    } else if (data_type == sr_ethertype::ethertype_ip) {
-      ip.convert_to_host_order();
-    }
-    _eth_header->ether_type = ntohs(_eth_header->ether_type);
-  }
-
-  void convert_to_network_order() {
-    if (data_type == sr_ethertype::ethertype_arp) {
-      arp.convert_to_network_order();
-    } else if (data_type == sr_ethertype::ethertype_ip) {
-      ip.convert_to_network_order();
-    }
-    _eth_header->ether_type = htons(_eth_header->ether_type);
   }
 
   uint16_t get_type() const { return data_type; }
 
   void print_header() {
-    spdlog::info("ETHERNET header:");
-    spdlog::info("\tdestination: ");
-    print_addr_eth(_eth_header->ether_dhost);
-    spdlog::info("\tsource: ");
-    print_addr_eth(_eth_header->ether_shost);
-    spdlog::info("\ttype: {}", data_type);
+    print_hdr_eth((uint8_t *)_eth_header);
+    print_addr_eth((uint8_t *)_eth_header);
+    std::cout << "Full packet size: " << packet_ref.size() << std::endl;
   }
 
-  const std::vector<uint8_t> &raw_packet() const { return _eth_packet; }
+  void update_header_data(mac_addr src, mac_addr dst, uint16_t type) {
+    memcpy(_eth_header->ether_shost, src.data(), ETHER_ADDR_LEN);
+    memcpy(_eth_header->ether_dhost, dst.data(), ETHER_ADDR_LEN);
+    _eth_header->ether_type = htons(type);
+  }
+
   const sr_ethernet_hdr_t *header() const { return _eth_header; }
-  IP_Packet_Header ip;
-  ARP_Packet_Header arp;
 
 private:
-  std::vector<uint8_t> _eth_packet;
+  Packet &packet_ref;
   sr_ethernet_hdr_t *_eth_header;
   uint16_t data_type = 0;
 };

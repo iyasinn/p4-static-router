@@ -1,5 +1,6 @@
 #ifndef STATICROUTER_H
 #define STATICROUTER_H
+#include <cstdint>
 #include <vector>
 #include <memory>
 #include <mutex>
@@ -7,6 +8,7 @@
 #include "IArpCache.h"
 #include "IPacketSender.h"
 #include "IRoutingTable.h"
+#include "RouterTypes.h"
 
 
 class StaticRouter {
@@ -28,6 +30,24 @@ private:
     std::shared_ptr<IPacketSender> packetSender;
 
     std::unique_ptr<IArpCache> arpCache;
+
+
+    std::optional<RoutingInterface> getRoutingInterfaceWithIp(ip_addr ip){
+        for (auto& [iface, interface] : routingTable->getRoutingInterfaces()){
+            if (interface.ip == ip){
+                return interface;
+            }
+        }
+        return std::nullopt;
+    }
+
+
+    std::vector<uint8_t> generate_arp_reply_packet(){
+
+        return std::vector<uint8_t>();
+
+    }
+
 };
 
 

@@ -7,11 +7,11 @@ ssh -i ~/.ssh/eecs489-key-pair.pem -R 6633:localhost:6633 ubuntu@ec2-54-172-250-
 scp -i ~/.ssh/eecs489-key-pair.pem ~/.ssh/id_ed25519.pub ubuntu@ec2-54-172-250-24.compute-1.amazonaws.com:~/.ssh/
 
 
-
+ec2-34-229-121-36.compute-1.amazonaws.com
 
 🔵 AWS Commands
 # Replace the ipv4 address below with AWS ipv4 address
-export AWS_IP="ec2-54-167-16-202.compute-1.amazonaws.com" 
+export AWS_IP="ec2-34-229-121-36.compute-1.amazonaws.com" 
 ssh -i ~/.ssh/eecs489-key-pair.pem -R 6633:localhost:6633 ubuntu@$AWS_IP
 ./run_mininet.sh
 
@@ -25,7 +25,7 @@ Depends on which directory we call it from
 
 
 🔵 Emulating Pings
-client ping -c 4 server2
+client ping -c 1 server2
 
 ------------------------------
 

@@ -6,6 +6,7 @@
 #include <cstring>
 #include <spdlog/spdlog.h>
 
+#include "IRoutingTable.h"
 #include "protocol.h"
 #include "utils.h"
 
@@ -33,17 +34,39 @@ void StaticRouter::handlePacket(std::vector<uint8_t> packet,
   std::cout << "Received packet on interface: " << iface << std::endl;
   std::cout << "Packet size: " << packet.size() << std::endl;
 
-  ETH_Packet eth(packet);
+  EthPacketHeader eth(packet);
   eth.print_header();
 
   // auto dst_addr = make_mac_addr(ethr->ether_dhost);
 
   if (eth.get_type() == sr_ethertype::ethertype_arp) {
-    eth.convert_to_host_order();
-    ARP_Packet_Header &arp = eth.arp;
-    print_hdr_arp((uint8_t *)arp._arp_packet);
-    std::cout << "\n";
-    // arp.print_header();
+    ArpPacketHeader arp(packet);
+    arp.print_header();
+
+    std::cout << "\n\n\n";
+
+    if (arp.get_type() == sr_arp_opcode::arp_op_reply) {
+      spdlog::info("TODO: Implement replies for arp");
+      return;
+    }
+
+    // auto interface = getRoutingInterfaceWithIp(arp.get_target_ip());
+    auto interface = getRoutingInterfaceWithIp(arp.header().ar_tip);
+
+    if (interface == std::nullopt) {
+      spdlog::info("ARP packet not destined for us");
+      return;
+    }
+
+    arp.convert_to_reply(interface->ip, interface->mac);
+    eth.update_header_data(interface->mac, arp.get_target_mac(), sr_ethertype::ethertype_arp);
+
+    eth.print_header();
+    arp.print_header();
+
+    packetSender->sendPacket(packet, iface);
+
+    arp.print_header();
   }
 
   // if (packet_type == sr_ethertype::ethertype_ip) {
