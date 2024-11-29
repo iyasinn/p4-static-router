@@ -31,77 +31,51 @@ void StaticRouter::handlePacket(std::vector<uint8_t> packet,
     return;
   }
 
-  std::cout << "Received packet on interface: " << iface << std::endl;
-  std::cout << "Packet size: " << packet.size() << std::endl;
+  spdlog::info("Received packet on interface: {}", iface);
+  spdlog::info("Packet size: {}", packet.size());
 
   EthPacketHeader eth(packet);
+
   eth.print_header();
 
-  // auto dst_addr = make_mac_addr(ethr->ether_dhost);
+  spdlog::info("Hnadling Packet");
 
   if (eth.get_type() == sr_ethertype::ethertype_arp) {
     ArpPacketHeader arp(packet);
-    arp.print_header();
 
-    std::cout << "\n\n\n";
-
-    if (arp.get_type() == sr_arp_opcode::arp_op_reply) {
+    if (arp.get_type() == sr_arp_opcode::arp_op_request) {
+      handle_incoming_arp_request(packet, iface);
+    } else if (arp.get_type() == sr_arp_opcode::arp_op_reply) {
       spdlog::info("TODO: Implement replies for arp");
       return;
     }
-
-    auto interface = routingTable->getRoutingInterface(iface);
-
-    if (interface.ip != arp.header().ar_tip) {
-      spdlog::info("ARP packet not destined for us");
-      return;
-    }
-
-    arp.convert_to_reply(interface.ip, interface.mac);
-    eth.update_header_data(interface.mac, arp.get_target_mac(),
-                           sr_ethertype::ethertype_arp);
-
-    eth.print_header();
-    arp.print_header();
-
-    packetSender->sendPacket(packet, iface);
-
-    arp.print_header();
   }
-
-  // if (packet_type == sr_ethertype::ethertype_ip) {
-
-  //   sr_ip_hdr_t *ipr =
-  //       (sr_ip_hdr_t *)(packet.data() + sizeof(sr_ethernet_hdr_t));
-
-  //   print_hdr_ip((uint8_t *)(ipr));
-
-  //   std::cout << "HAVE NOT IMPLEMENTED THIS YET\n";
-
-  // } else if (packet_type == sr_ethertype::ethertype_arp) {
-
-  //   sr_arp_hdr_t *arp =
-  //       (sr_arp_hdr_t *)(packet.data() + sizeof(sr_ethernet_hdr_t));
-
-  //   ARP_Packet_Header arp_header(arp);
-
-  //   print_hdr_arp((uint8_t *)&(arp_header.packet()));
-
-  //   arp_header.convert_to_host_order();
-
-  //   print_hdr_arp((uint8_t *)&(arp_header.packet()));
-
-  //   // Extract the ARP operation type
-  //   uint16_t arp_type = ntohs(arp->ar_op);
-
-  //   // Log or process the ARP type as needed
-  //   spdlog::info("ARP operation type: {}", arp_type);
-
-  //   ETH_Packet eth(packet);
-  // }
 
   return;
 }
+
+void StaticRouter::handle_incoming_arp_request(Packet packet,
+                                               std::string iface) {
+  EthPacketHeader eth(packet);
+  ArpPacketHeader arp(packet);
+
+  auto interface = routingTable->getRoutingInterface(iface);
+
+  if (interface.ip != arp.header().ar_tip) {
+    spdlog::error("ARP packet not destined for us");
+    return;
+  }
+
+  arp.convert_to_reply(interface.ip, interface.mac);
+  eth.update_header_data(interface.mac, arp.get_target_mac(),
+                         sr_ethertype::ethertype_arp);
+
+  spdlog::info("Sending ARP packet\n\n");
+  eth.print_header();
+  arp.print_header();
+  packetSender->sendPacket(packet, iface);
+}
+
 // auto mac_addr = make_mac_addr(ethr->ether_dhost);
 //   for (int i = 0; i < mac_addr.size(); i++) {
 //     std::cout << std::hex << (int)mac_addr[i] << ":";
@@ -132,3 +106,34 @@ Questions:
 
 
 */
+
+// if (packet_type == sr_ethertype::ethertype_ip) {
+
+//   sr_ip_hdr_t *ipr =
+//       (sr_ip_hdr_t *)(packet.data() + sizeof(sr_ethernet_hdr_t));
+
+//   print_hdr_ip((uint8_t *)(ipr));
+
+//   std::cout << "HAVE NOT IMPLEMENTED THIS YET\n";
+
+// } else if (packet_type == sr_ethertype::ethertype_arp) {
+
+//   sr_arp_hdr_t *arp =
+//       (sr_arp_hdr_t *)(packet.data() + sizeof(sr_ethernet_hdr_t));
+
+//   ARP_Packet_Header arp_header(arp);
+
+//   print_hdr_arp((uint8_t *)&(arp_header.packet()));
+
+//   arp_header.convert_to_host_order();
+
+//   print_hdr_arp((uint8_t *)&(arp_header.packet()));
+
+//   // Extract the ARP operation type
+//   uint16_t arp_type = ntohs(arp->ar_op);
+
+//   // Log or process the ARP type as needed
+//   spdlog::info("ARP operation type: {}", arp_type);
+
+//   ETH_Packet eth(packet);
+// }

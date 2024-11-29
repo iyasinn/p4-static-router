@@ -48,44 +48,33 @@ public:
     _arp_packet->ar_tip = htonl(_arp_packet->ar_tip);
   }
 
-  ip_addr get_target_ip(){
-    return ntohl(_arp_packet->ar_tip);
-  }
+  ip_addr get_target_ip() { return ntohl(_arp_packet->ar_tip); }
 
-  unsigned short get_type(){
-    return ntohs(_arp_packet->ar_op);
-  }
+  unsigned short get_type() { return ntohs(_arp_packet->ar_op); }
 
-  void print_header(){
+  void print_header() {
     std::cout << std::endl;
     print_hdr_arp((uint8_t *)&_arp_packet);
   }
 
-  mac_addr get_sender_mac(){
-    return make_mac_addr(_arp_packet->ar_sha);
-  }
+  mac_addr get_sender_mac() { return make_mac_addr(_arp_packet->ar_sha); }
 
-  mac_addr get_target_mac(){
-    return make_mac_addr(_arp_packet->ar_tha);
-  }
-
+  mac_addr get_target_mac() { return make_mac_addr(_arp_packet->ar_tha); }
 
   // Converst the ARP packet to a reply packet
   // Assertion: We have a valid Request packet
-  void convert_to_reply(uint32_t new_sender_ip, mac_addr new_sender_mac_addr){
+  void convert_to_reply(uint32_t new_sender_ip, mac_addr new_sender_mac_addr) {
 
     header().ar_op = htons(sr_arp_opcode::arp_op_reply);
 
     // Update Target to be our Sender
-    header().ar_tip = header().ar_sip; 
+    header().ar_tip = header().ar_sip;
     memcpy(header().ar_tha, header().ar_sha, ETHER_ADDR_LEN);
 
-    // Update Sender 
+    // Update Sender
     header().ar_sip = new_sender_ip;
     memcpy(header().ar_sha, new_sender_mac_addr.data(), ETHER_ADDR_LEN);
-
   }
-
 
   sr_arp_hdr_t &header() { return *_arp_packet; }
 
@@ -171,7 +160,6 @@ public:
   void print_header() {
     print_hdr_eth((uint8_t *)_eth_header);
     print_addr_eth((uint8_t *)_eth_header);
-    std::cout << "Full packet size: " << packet_ref.size() << std::endl;
   }
 
   void update_header_data(mac_addr src, mac_addr dst, uint16_t type) {
