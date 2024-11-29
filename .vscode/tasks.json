@@ -6,7 +6,7 @@
       "type": "shell",
       "command": "make",
       "options": {
-        "cwd": "build"
+        "cwd": "${workspaceFolder}/build"
       },
       "group": {
         "kind": "build",

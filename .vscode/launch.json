@@ -5,6 +5,18 @@
   "version": "0.2.0",
   "configurations": [
     {
+      "name": "unit test a.out",
+      "type": "cppdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}/unit_test/a.out",
+      "args": [],
+      "stopAtEntry": false,
+      "cwd": "${fileDirname}",
+      "environment": [],
+      "externalConsole": false,
+      "MIMode": "lldb"
+    },
+    {
       "type": "lldb",
       "request": "launch",
       "name": "Debug",
@@ -12,6 +24,35 @@
       "args": ["-r", "./rtable"],
       "cwd": "${workspaceFolder}",
       "preLaunchTask": "build"
+    },
+    {
+      "name": "(gdb) Launch",
+      "type": "cppdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}/build/StaticRouter",
+      "args": ["-r", "${workspaceFolder}/rtable"],
+      "stopAtEntry": false,
+      "cwd": "${fileDirname}",
+      "environment": [],
+      "externalConsole": false,
+      "MIMode": "gdb",
+      "setupCommands": [
+        {
+          "description": "Enable pretty-printing for gdb",
+          "text": "-enable-pretty-printing",
+          "ignoreFailures": true
+        },
+        {
+          "description": "Set Disassembly Flavor to Intel",
+          "text": "-gdb-set disassembly-flavor intel",
+          "ignoreFailures": true
+        },
+        {
+          "description": "Handle SIGUSR1 nostop noprint",
+          "text": "handle SIGUSR1 nostop noprint",
+          "ignoreFailures": true
+        }
+      ]
     }
   ]
 }
