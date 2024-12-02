@@ -26,6 +26,8 @@ void StaticRouter::handlePacket(std::vector<uint8_t> packet,
                                 std::string iface) {
   std::unique_lock lock(mutex);
 
+  spdlog::info("\n\nHandle packet invoked");
+
   if (packet.size() < sizeof(sr_ethernet_hdr_t)) {
     spdlog::error("Packet is too small to contain an Ethernet header.");
     return;
@@ -57,6 +59,10 @@ void StaticRouter::handle_ip(Packet packet, const std::string &iface) {
 void StaticRouter::handle_arp(Packet packet, const std::string &iface) {
   ArpPacketHeader arp(packet);
 
+  spdlog::info("Handling Arp packet");
+  spdlog::info("Printing ARP Packet");
+  arp.print_header();
+
   switch (arp.get_type()) {
   case sr_arp_opcode::arp_op_request:
     handle_arp_request(packet, iface);
@@ -71,6 +77,8 @@ void StaticRouter::handle_arp(Packet packet, const std::string &iface) {
 }
 
 void StaticRouter::handle_arp_request(Packet packet, const std::string &iface) {
+
+  spdlog::info("Handling ARP Request");
 
   int size_for_arp = packet.size() - sizeof(sr_ethernet_hdr_t);
 
@@ -103,13 +111,15 @@ void StaticRouter::handle_arp_request(Packet packet, const std::string &iface) {
   ArpPacketHeader random(eth_packet);
   EthPacketHeader rnadometh(eth_packet);
 
-  spdlog::info("Sending ARP packet\n\n");
+  spdlog::info("Sending ARP reply packet\n");
   eth.print_header();
   rnadometh.print_header();
   packetSender->sendPacket(eth_packet, iface);
 }
 
 void StaticRouter::handle_arp_reply(Packet packet, const std::string &iface) {
+
+  spdlog::info("Handling ARP Reply");
 
   EthPacketHeader eth(packet);
   ArpPacketHeader arp(packet);
@@ -120,6 +130,8 @@ void StaticRouter::handle_arp_reply(Packet packet, const std::string &iface) {
     spdlog::error("ARP packet reply not destined for any of our interfaces");
     return;
   }
+
+  spdlog::info("Attemping to add ARP reply data to cache");
 
   arpCache->addEntry(arp.get_sender_ip(), arp.get_sender_mac());
 }

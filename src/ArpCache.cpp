@@ -74,9 +74,11 @@ void ArpCache::addEntry(uint32_t ip, const mac_addr &mac) {
 
   // Ignore if we did not issue the request
   if (!requests.count(ip)) {
+    spdlog::info("Ignoring ARP reply addEntry to cache because we did not "
+                 "issue a request for IP: {}",
+                 ip);
     return;
   }
-
 
   entries[ip].ip = ip;
   entries[ip].mac = mac;
