@@ -4,11 +4,11 @@
 #include "utils.h"
 // #include <_types/_uint8_t.h>
 #include <_types/_uint16_t.h>
+#include <_types/_uint8_t.h>
 #include <array>
 #include <cstdint>
 #include <iostream>
 #include <iterator>
-#include <vector>
 
 class ArpPacketHeader {
 public:
@@ -129,75 +129,61 @@ private:
   uint16_t data_type = 0;
 };
 
-enum class Type { T0, T3, T11 };
-
-enum class Code { Zero, NetUnreachable, HostUnreachable, PortUnreachable };
-
-class ICMPException : public std::exception {
+class ICMPPacket {
 public:
-  ICMPException(Type type, Code code) : _type(type), _code(code) {}
+  enum class Type { T0, T3, T11 };
 
-  const char *what() const noexcept override { return "ICMP error occurred"; }
+  enum class Code { Zero, NetUnreachable, HostUnreachable, PortUnreachable };
 
-  Type getType() const { return _type; }
-  Code getCode() const { return _code; }
+  ICMPPacket(Type type, Code code, std::vector<uint8_t> data_in = {}) {
 
-private:
-  Type _type;
-  Code _code;
-};
-
-class ICMP_Packet {
-public:
-  ICMP_Packet(const ICMPException &e) : _type(e.getType()), _code(e.getCode()) {
-    switch (_type) {
-    case Type::T3:
-      _t3_packet = new sr_icmp_t3_hdr_t();
-      break;
-    case Type::T0:
-    case Type::T11:
-      _packet = new sr_icmp_hdr_t();
-      break;
+    if (type == Type::T3 && data_in.size() > ICMP_DATA_SIZE) {
+      std::cout << "Cannot create\n";
+      exit(1);
     }
-  }
 
-  ~ICMP_Packet() {
-    if (_type == Type::T3) { // prefer if-else bc of less opts
-      delete _t3_packet;
-    } else {
-      delete _packet;
-    }
-  }
+    _type = type;
+    _code = code;
 
-  void calc_checksum() {
     if (_type == Type::T3) {
-      _t3_packet->icmp_sum = 0;
-      _t3_packet->icmp_sum =
-          cksum(_t3_packet, sizeof(sr_icmp_t3_hdr_t)); // ! dk if this right
+      t3_packet.icmp_type = (uint8_t)type;
+      t3_packet.icmp_code = (uint8_t)code;
+
+      t3_packet.next_mtu = htons(1500);
+      t3_packet.unused = htons(0);
+
+      memset(t3_packet.data, 0, ICMP_DATA_SIZE);
+      memcpy(t3_packet.data, data_in.data(), ICMP_DATA_SIZE);
     } else {
-      _packet->icmp_sum = 0;
-      _packet->icmp_sum = cksum(_packet, sizeof(sr_icmp_hdr_t)); // ! same here
+      t_packet.icmp_type = (uint8_t)type;
+      t_packet.icmp_code = (uint8_t)code;
+    }
+
+    calculate_checksum();
+  }
+
+  void calculate_checksum() {
+    if (_type == Type::T3) {
+      t3_packet.icmp_sum = 0;
+      t3_packet.icmp_sum =
+          cksum(&t3_packet, sizeof(sr_icmp_t3_hdr_t)); // ! dk if this right
+    } else {
+      t_packet.icmp_sum = 0;
+      t_packet.icmp_sum =
+          cksum(&t_packet, sizeof(sr_icmp_hdr_t)); // ! same here
     }
   }
 
-  void prepare_for_send() {
-    convert_to_network_order();
-    calc_checksum();
-  }
+  Packet get_packet() const {
 
-  // ! put prepare_for_send() inside to_packet()? prob fine,
-  // ! dt decoupling a huge issue here, but ill leave as is
-  Packet to_packet() const {
     Packet packet;
-    packet.clear();
 
-    // serialize
     if (_type == Type::T3) {
       packet.resize(sizeof(sr_icmp_t3_hdr_t));
-      std::memcpy(packet.data(), _t3_packet, sizeof(sr_icmp_t3_hdr_t));
+      std::memcpy(packet.data(), &t3_packet, sizeof(sr_icmp_t3_hdr_t));
     } else {
       packet.resize(sizeof(sr_icmp_hdr_t));
-      std::memcpy(packet.data(), _packet, sizeof(sr_icmp_hdr_t));
+      std::memcpy(packet.data(), &t_packet, sizeof(sr_icmp_hdr_t));
     }
 
     return packet;
@@ -206,21 +192,21 @@ public:
   void convert_to_network_order() {
     // ! dont need to convert type/code fields bc theyre only one byte long
     if (_type == Type::T3) {
-      _t3_packet->icmp_sum = htons(_t3_packet->icmp_sum);
-      _t3_packet->unused = htons(_t3_packet->unused);
-      _t3_packet->next_mtu = htons(_t3_packet->next_mtu);
+      t3_packet.icmp_sum = htons(t3_packet.icmp_sum);
+      t3_packet.unused = htons(t3_packet.unused);
+      t3_packet.next_mtu = htons(t3_packet.next_mtu);
     } else {
-      _packet->icmp_sum = htons(_packet->icmp_sum);
+      t_packet.icmp_sum = htons(t_packet.icmp_sum);
     }
   }
 
   void convert_to_host_order() {
     if (_type == Type::T3) {
-      _t3_packet->icmp_sum = ntohs(_t3_packet->icmp_sum);
-      _t3_packet->unused = ntohs(_t3_packet->unused);
-      _t3_packet->next_mtu = ntohs(_t3_packet->next_mtu);
+      t3_packet.icmp_sum = ntohs(t3_packet.icmp_sum);
+      t3_packet.unused = ntohs(t3_packet.unused);
+      t3_packet.next_mtu = ntohs(t3_packet.next_mtu);
     } else {
-      _packet->icmp_sum = ntohs(_packet->icmp_sum);
+      t_packet.icmp_sum = ntohs(t_packet.icmp_sum);
     }
   }
 
@@ -228,8 +214,8 @@ private:
   Type _type;
   Code _code;
   union {
-    sr_icmp_hdr_t *_packet;
-    sr_icmp_t3_hdr_t *_t3_packet;
+    sr_icmp_hdr_t t_packet;
+    sr_icmp_t3_hdr_t t3_packet;
   };
 };
 
