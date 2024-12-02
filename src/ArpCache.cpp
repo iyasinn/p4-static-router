@@ -71,6 +71,13 @@ void ArpCache::tick() {
 
 void ArpCache::addEntry(uint32_t ip, const mac_addr &mac) {
   std::unique_lock lock(mutex);
+
+  // Ignore if we did not issue the request
+  if (!requests.count(ip)) {
+    return;
+  }
+
+
   entries[ip].ip = ip;
   entries[ip].mac = mac;
   entries[ip].timeAdded = std::chrono::steady_clock::now();

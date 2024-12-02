@@ -73,22 +73,20 @@ void StaticRouter::handle_arp(Packet packet, const std::string &iface) {
 void StaticRouter::handle_arp_request(Packet packet, const std::string &iface) {
 
   int size_for_arp = packet.size() - sizeof(sr_ethernet_hdr_t);
-  
+
   if (size_for_arp < sizeof(sr_arp_hdr_t)) {
     spdlog::error("ARP packet is too small to contain an ARP header.");
     return;
   }
 
-
   EthPacketHeader eth(packet);
   ArpPacketHeader arp(packet);
-
-  // Need to see if we have enough space for an arp packet
 
   auto interface = routingTable->getRoutingInterface(iface);
 
   if (interface.ip != arp.header().ar_tip) {
-    spdlog::error("ARP packet not destined for us");
+    spdlog::error("ARP packet request not destined for any of our interfaces");
+    // WOuld i do destinatino urneachable
     return;
   }
 
@@ -113,13 +111,15 @@ void StaticRouter::handle_arp_request(Packet packet, const std::string &iface) {
 
 void StaticRouter::handle_arp_reply(Packet packet, const std::string &iface) {
 
-
-  /*
-    So we are receiving a reply. Is this reply for us? We should 
-
-  */
-
   EthPacketHeader eth(packet);
   ArpPacketHeader arp(packet);
+
+  auto interface = routingTable->getRoutingInterface(iface);
+
+  if (interface.ip != arp.header().ar_tip) {
+    spdlog::error("ARP packet reply not destined for any of our interfaces");
+    return;
+  }
+
   arpCache->addEntry(arp.get_sender_ip(), arp.get_sender_mac());
 }
