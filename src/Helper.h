@@ -277,10 +277,6 @@ inline Packet create_ip_packet(ip_addr src_ip, ip_addr dst_ip, uint8_t protocol,
   return packet;
 }
 
-inline Packet create_icmp_packet(Type icmp_type, Code code) {}
-
-inline Packet create_icmp_t3_packet(Code code) {}
-
 // Creates an arp request
 inline Packet create_arp_packet(mac_addr src_mac, ip_addr src_ip,
                                 mac_addr dst_mac, ip_addr dst_ip,
