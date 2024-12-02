@@ -265,11 +265,10 @@ inline Packet create_ethernet_packet(mac_addr src_mac, mac_addr dst_mac,
   Type 8 0 - Echo request?
 */
 
-// inline Packet create_ip_packet(ip_addr src_ip, ip_addr dst_ip, uint8_t
-// protocol,
+//    inline Packet create_ip_packet(ip_addr src_ip, ip_addr dst_ip, uint8_t
+//    protocol,
 //                                Packet data, uint8_t ttl = 64) {
 //   sr_ip_hdr_t ip_header;
-
 //   ip_header.ip_tos = 0;
 //   ip_header.ip_len = htons(data.size() + sizeof(sr_ip_hdr_t));
 //   ip_header.ip_id = htons(0);
@@ -285,7 +284,7 @@ inline Packet create_ethernet_packet(mac_addr src_mac, mac_addr dst_mac,
 //   memcpy(packet.data() + sizeof(sr_ip_hdr_t), data.data(), data.size());
 
 //   return packet;
-// }
+//   }
 
 // Creates an arp request
 inline Packet create_arp_packet(mac_addr src_mac, ip_addr src_ip,

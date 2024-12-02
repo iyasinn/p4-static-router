@@ -71,8 +71,19 @@ void StaticRouter::handle_arp(Packet packet, const std::string &iface) {
 }
 
 void StaticRouter::handle_arp_request(Packet packet, const std::string &iface) {
+
+  int size_for_arp = packet.size() - sizeof(sr_ethernet_hdr_t);
+  
+  if (size_for_arp < sizeof(sr_arp_hdr_t)) {
+    spdlog::error("ARP packet is too small to contain an ARP header.");
+    return;
+  }
+
+
   EthPacketHeader eth(packet);
   ArpPacketHeader arp(packet);
+
+  // Need to see if we have enough space for an arp packet
 
   auto interface = routingTable->getRoutingInterface(iface);
 
@@ -101,6 +112,13 @@ void StaticRouter::handle_arp_request(Packet packet, const std::string &iface) {
 }
 
 void StaticRouter::handle_arp_reply(Packet packet, const std::string &iface) {
+
+
+  /*
+    So we are receiving a reply. Is this reply for us? We should 
+
+  */
+
   EthPacketHeader eth(packet);
   ArpPacketHeader arp(packet);
   arpCache->addEntry(arp.get_sender_ip(), arp.get_sender_mac());
