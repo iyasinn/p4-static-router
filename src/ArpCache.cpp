@@ -100,7 +100,7 @@ void ArpCache::queuePacket(uint32_t ip, const Packet &packet,
   std::unique_lock lock(mutex);
 
   if (getEntry(ip) != std::nullopt) {
-    EthPacketHeader eth(packet);
+    EthHeaderModifier eth(packet);
     eth.update_dst_mac(getEntry(ip).value());
     packetSender->sendPacket(packet, iface);
     return;
