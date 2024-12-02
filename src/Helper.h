@@ -3,26 +3,12 @@
 #include "spdlog/spdlog.h"
 #include "utils.h"
 // #include <_types/_uint8_t.h>
+#include <_types/_uint16_t.h>
+#include <array>
 #include <cstdint>
 #include <iostream>
 #include <iterator>
 #include <vector>
-
-// bool ip_checksum_valid(sr_ip_hdr_t *ip) {
-//   int checksum = cksum(ip, sizeof(sr_ip_hdr_t));
-// }
-
-// class ETHR_Packet {
-
-//   //   sr_ethertype;
-// }
-
-// class PacketHeader {
-// public:
-//   virtual ~PacketHeader() = default;
-//   virtual void convert_to_host_order() = 0;
-//   virtual void convert_to_network_order() = 0;
-// };
 
 class ArpPacketHeader {
 public:
@@ -32,34 +18,46 @@ public:
         (sr_arp_hdr_t *)(raw_eth_packet.data() + sizeof(sr_ethernet_hdr_t));
   }
 
-  void convert_to_host_order() {
-    _arp_packet->ar_hrd = ntohs(_arp_packet->ar_hrd);
-    _arp_packet->ar_pro = ntohs(_arp_packet->ar_pro);
-    _arp_packet->ar_op = ntohs(_arp_packet->ar_op);
-    _arp_packet->ar_sip = ntohl(_arp_packet->ar_sip);
-    _arp_packet->ar_tip = ntohl(_arp_packet->ar_tip);
-  }
+  ArpPacketHeader(sr_arp_hdr_t *arp_header_in) : _arp_packet(arp_header_in) {}
 
-  void convert_to_network_order() {
-    _arp_packet->ar_hrd = htons(_arp_packet->ar_hrd);
-    _arp_packet->ar_pro = htons(_arp_packet->ar_pro);
-    _arp_packet->ar_op = htons(_arp_packet->ar_op);
-    _arp_packet->ar_sip = htonl(_arp_packet->ar_sip);
-    _arp_packet->ar_tip = htonl(_arp_packet->ar_tip);
-  }
+  // void convert_to_host_order() {
+  //   _arp_packet->ar_hrd = ntohs(_arp_packet->ar_hrd);
+  //   _arp_packet->ar_pro = ntohs(_arp_packet->ar_pro);
+  //   _arp_packet->ar_op = ntohs(_arp_packet->ar_op);
+  //   _arp_packet->ar_sip = ntohl(_arp_packet->ar_sip);
+  //   _arp_packet->ar_tip = ntohl(_arp_packet->ar_tip);
+  // }
 
-  ip_addr get_target_ip() { return ntohl(_arp_packet->ar_tip); }
+  // void convert_to_network_order() {
+  //   _arp_packet->ar_hrd = htons(_arp_packet->ar_hrd);
+  //   _arp_packet->ar_pro = htons(_arp_packet->ar_pro);
+  //   _arp_packet->ar_op = htons(_arp_packet->ar_op);
+  //   _arp_packet->ar_sip = htonl(_arp_packet->ar_sip);
+  //   _arp_packet->ar_tip = htonl(_arp_packet->ar_tip);
+  // }
 
   unsigned short get_type() { return ntohs(_arp_packet->ar_op); }
+
+  // Returns target ip in network order
+  ip_addr get_target_ip() { return _arp_packet->ar_tip; }
+  mac_addr get_target_mac() { return make_mac_addr(_arp_packet->ar_tha); }
+
+  // Returns sender ip in network order
+  ip_addr get_sender_ip() { return _arp_packet->ar_sip; }
+  mac_addr get_sender_mac() { return make_mac_addr(_arp_packet->ar_sha); }
+
+  void update_src_mac(const mac_addr &mac) {
+    memcpy(_arp_packet->ar_sha, mac.data(), ETHER_ADDR_LEN);
+  }
+
+  void update_dst_mac(const mac_addr &mac) {
+    memcpy(_arp_packet->ar_tha, mac.data(), ETHER_ADDR_LEN);
+  }
 
   void print_header() {
     std::cout << std::endl;
     print_hdr_arp((uint8_t *)&_arp_packet);
   }
-
-  mac_addr get_sender_mac() { return make_mac_addr(_arp_packet->ar_sha); }
-
-  mac_addr get_target_mac() { return make_mac_addr(_arp_packet->ar_tha); }
 
   // Converst the ARP packet to a reply packet
   // Assertion: We have a valid Request packet
@@ -82,68 +80,9 @@ private:
   sr_arp_hdr_t *_arp_packet = nullptr;
 };
 
-class IP_Packet_Header {
-public:
-  IP_Packet_Header() {}
-
-  IP_Packet_Header(sr_ip_hdr_t *const data) : _ip_packet(data) {}
-
-  void convert_to_host_order() {
-    _ip_packet->ip_len = ntohs(_ip_packet->ip_len); // Total length of IP packet
-    _ip_packet->ip_id =
-        ntohs(_ip_packet->ip_id); // Identification field for fragmentation
-    _ip_packet->ip_off = ntohs(_ip_packet->ip_off); // Fragment offset field
-    _ip_packet->ip_sum = ntohs(_ip_packet->ip_sum); // IP header checksum
-    _ip_packet->ip_src = ntohl(_ip_packet->ip_src); // Source IP address
-    _ip_packet->ip_dst = ntohl(_ip_packet->ip_dst); // Destination IP address
-  }
-
-  void convert_to_network_order() {
-    _ip_packet->ip_len = htons(_ip_packet->ip_len); // Total length of IP packet
-    _ip_packet->ip_id =
-        htons(_ip_packet->ip_id); // Identification field for fragmentation
-    _ip_packet->ip_off = htons(_ip_packet->ip_off); // Fragment offset field
-    _ip_packet->ip_sum = htons(_ip_packet->ip_sum); // IP header checksum
-    _ip_packet->ip_src = htonl(_ip_packet->ip_src); // Source IP address
-    _ip_packet->ip_dst = htonl(_ip_packet->ip_dst); // Destination IP address
-  }
-
-  // void print_header() {
-  //   // sr_ip_hdr_t *iphdr = (sr_ip_hdr_t *)(buf);
-  //   spdlog::info("IP header:");
-  //   spdlog::info("\tversion: {}", static_cast<int>(_ip_packet->ip_v));
-  //   spdlog::info("\theader length: {}", static_cast<int>(_ip_packet->ip_hl));
-  //   spdlog::info("\ttype of service: {}", _ip_packet->ip_tos);
-  //   spdlog::info("\tlength: {}", (_ip_packet->ip_len));
-  //   spdlog::info("\tid: {}", (_ip_packet->ip_id));
-
-  //   if (ntohs(_ip_packet->ip_off) & IP_DF)
-  //     spdlog::info("\tfragment flag: DF");
-  //   else if ((_ip_packet->ip_off) & IP_MF)
-  //     spdlog::info("\tfragment flag: MF");
-  //   else if ((_ip_packet->ip_off) & IP_RF)
-  //     spdlog::info("\tfragment flag: R");
-
-  //   spdlog::info("\tfragment offset: {}", (_ip_packet->ip_off) & IP_OFFMASK);
-  //   spdlog::info("\tTTL: {}", _ip_packet->ip_ttl);
-  //   spdlog::info("\tprotocol: {}", _ip_packet->ip_p);
-  //   spdlog::info("\tchecksum: {}",
-  //   static_cast<uint32_t>(_ip_packet->ip_sum)); spdlog::info("\tsource: ");
-  //   print_addr_ip_int((_ip_packet->ip_src));
-  //   spdlog::info("\tdestination: ");
-  //   print_addr_ip_int((_ip_packet->ip_dst));
-  // }
-
-  const sr_ip_hdr_t &packet() const { return *_ip_packet; }
-
-private:
-  sr_ip_hdr_t *_ip_packet = nullptr;
-};
-
 class EthPacketHeader {
 public:
-  EthPacketHeader(std::vector<uint8_t> &raw_network_data)
-      : packet_ref(raw_network_data) {
+  EthPacketHeader(const std::vector<uint8_t> &raw_network_data) {
 
     if (raw_network_data.size() < sizeof(sr_ethernet_hdr_t)) {
       std::cerr << "Error: <data> does not contain enough bytes for an "
@@ -155,13 +94,28 @@ public:
     data_type = ntohs(_eth_header->ether_type);
   }
 
+  EthPacketHeader(sr_ethernet_hdr_t *eth_in) : _eth_header(eth_in) {}
+
   uint16_t get_type() const { return data_type; }
+
+  void update_type(sr_ethertype host_order_type) {
+    _eth_header->ether_type = htons(host_order_type);
+  }
+
+  void update_src_mac(const mac_addr &src) {
+    memcpy(_eth_header->ether_shost, src.data(), ETHER_ADDR_LEN);
+  }
+
+  void update_dst_mac(const mac_addr &dst) {
+    memcpy(_eth_header->ether_dhost, dst.data(), ETHER_ADDR_LEN);
+  }
 
   void print_header() {
     print_hdr_eth((uint8_t *)_eth_header);
     print_addr_eth((uint8_t *)_eth_header);
   }
 
+  // type is in host order
   void update_header_data(mac_addr src, mac_addr dst, uint16_t type) {
     memcpy(_eth_header->ether_shost, src.data(), ETHER_ADDR_LEN);
     memcpy(_eth_header->ether_dhost, dst.data(), ETHER_ADDR_LEN);
@@ -171,7 +125,201 @@ public:
   const sr_ethernet_hdr_t *header() const { return _eth_header; }
 
 private:
-  Packet &packet_ref;
   sr_ethernet_hdr_t *_eth_header;
   uint16_t data_type = 0;
 };
+
+enum class Type { T0, T3, T11 };
+
+enum class Code { Zero, NetUnreachable, HostUnreachable, PortUnreachable };
+
+class ICMPException : public std::exception {
+public:
+  ICMPException(Type type, Code code) : _type(type), _code(code) {}
+
+  const char *what() const noexcept override { return "ICMP error occurred"; }
+
+  Type getType() const { return _type; }
+  Code getCode() const { return _code; }
+
+private:
+  Type _type;
+  Code _code;
+};
+
+class ICMP_Packet {
+public:
+  ICMP_Packet(const ICMPException &e) : _type(e.getType()), _code(e.getCode()) {
+    switch (_type) {
+    case Type::T3:
+      _t3_packet = new sr_icmp_t3_hdr_t();
+      break;
+    case Type::T0:
+    case Type::T11:
+      _packet = new sr_icmp_hdr_t();
+      break;
+    }
+  }
+
+  ~ICMP_Packet() {
+    if (_type == Type::T3) { // prefer if-else bc of less opts
+      delete _t3_packet;
+    } else {
+      delete _packet;
+    }
+  }
+
+  void calc_checksum() {
+    if (_type == Type::T3) {
+      _t3_packet->icmp_sum = 0;
+      _t3_packet->icmp_sum =
+          cksum(_t3_packet, sizeof(sr_icmp_t3_hdr_t)); // ! dk if this right
+    } else {
+      _packet->icmp_sum = 0;
+      _packet->icmp_sum = cksum(_packet, sizeof(sr_icmp_hdr_t)); // ! same here
+    }
+  }
+
+  void prepare_for_send() {
+    convert_to_network_order();
+    calc_checksum();
+  }
+
+  // ! put prepare_for_send() inside to_packet()? prob fine,
+  // ! dt decoupling a huge issue here, but ill leave as is
+  Packet to_packet() const {
+    Packet packet;
+    packet.clear();
+
+    // serialize
+    if (_type == Type::T3) {
+      packet.resize(sizeof(sr_icmp_t3_hdr_t));
+      std::memcpy(packet.data(), _t3_packet, sizeof(sr_icmp_t3_hdr_t));
+    } else {
+      packet.resize(sizeof(sr_icmp_hdr_t));
+      std::memcpy(packet.data(), _packet, sizeof(sr_icmp_hdr_t));
+    }
+
+    return packet;
+  }
+
+  void convert_to_network_order() {
+    // ! dont need to convert type/code fields bc theyre only one byte long
+    if (_type == Type::T3) {
+      _t3_packet->icmp_sum = htons(_t3_packet->icmp_sum);
+      _t3_packet->unused = htons(_t3_packet->unused);
+      _t3_packet->next_mtu = htons(_t3_packet->next_mtu);
+    } else {
+      _packet->icmp_sum = htons(_packet->icmp_sum);
+    }
+  }
+
+  void convert_to_host_order() {
+    if (_type == Type::T3) {
+      _t3_packet->icmp_sum = ntohs(_t3_packet->icmp_sum);
+      _t3_packet->unused = ntohs(_t3_packet->unused);
+      _t3_packet->next_mtu = ntohs(_t3_packet->next_mtu);
+    } else {
+      _packet->icmp_sum = ntohs(_packet->icmp_sum);
+    }
+  }
+
+private:
+  Type _type;
+  Code _code;
+  union {
+    sr_icmp_hdr_t *_packet;
+    sr_icmp_t3_hdr_t *_t3_packet;
+  };
+};
+
+// * Helepr Generator Functions
+
+inline mac_addr get_broadcast_mac_addr() {
+  static const uint8_t broadcast_addr[ETHER_ADDR_LEN] = {0xFF, 0xFF, 0xFF,
+                                                         0xFF, 0xFF, 0xFF};
+  return make_mac_addr((void *)broadcast_addr);
+}
+
+inline Packet create_ethernet_packet(mac_addr src_mac, mac_addr dst_mac,
+                                     sr_ethertype type, Packet data) {
+
+  sr_ethernet_hdr_t eth_header;
+
+  EthPacketHeader eth(&eth_header);
+  eth.update_src_mac(src_mac);
+  eth.update_dst_mac(dst_mac);
+  eth.update_type(type);
+
+  Packet packet(sizeof(sr_ethernet_hdr_t) + data.size());
+  memcpy(packet.data(), &eth_header, sizeof(sr_ethernet_hdr_t));
+  memcpy(packet.data() + sizeof(sr_ethernet_hdr_t), data.data(), data.size());
+
+  return packet;
+}
+
+/*
+
+
+  Type 0 - Response to an Echo request ping to the oruter interfacece
+  Type 3 Code 1 - 7 unreachable arp requests
+  Type 3 Code 0 - NOn eexisten torute no matching entry in routing table
+  Type 3 Code 0 - No matching entry in routing table when forwarding ip packet
+  Type 11 code 0  - IP packet discard because the TTL field is 0
+
+  Type 8 0 - Echo request?
+
+*/
+inline Packet create_ip_packet(ip_addr src_ip, ip_addr dst_ip, uint8_t protocol,
+                               Packet data, uint8_t ttl = 64) {
+  sr_ip_hdr_t ip_header;
+
+  ip_header.ip_tos = 0;
+  ip_header.ip_len = htons(data.size() + sizeof(sr_ip_hdr_t));
+  ip_header.ip_id = htons(0);
+  ip_header.ip_off = htons(IP_DF); // Don't fragment
+  ip_header.ip_ttl = ttl;
+  ip_header.ip_p = protocol;
+  ip_header.ip_src = src_ip;
+  ip_header.ip_dst = dst_ip;
+  ip_header.ip_sum = 0; // Checksum calculated by router
+
+  Packet packet(sizeof(sr_ip_hdr_t) + data.size());
+  memcpy(packet.data(), &ip_header, sizeof(sr_ip_hdr_t));
+  memcpy(packet.data() + sizeof(sr_ip_hdr_t), data.data(), data.size());
+
+  return packet;
+}
+
+inline Packet create_icmp_packet(Type icmp_type, Code code) {}
+
+inline Packet create_icmp_t3_packet(Code code) {}
+
+// Creates an arp request
+inline Packet create_arp_packet(mac_addr src_mac, ip_addr src_ip,
+                                mac_addr dst_mac, ip_addr dst_ip,
+                                sr_arp_opcode type) {
+
+  sr_arp_hdr_t arp_header;
+
+  arp_header.ar_hrd = htons(sr_arp_hrd_fmt::arp_hrd_ethernet);
+  arp_header.ar_pro = htons(sr_ethertype::ethertype_arp);
+  arp_header.ar_hln = ETHER_ADDR_LEN;
+  // arp_header.ar_pln = sr_ip_hdr().ip_hl;
+  arp_header.ar_pln = 4;
+
+  arp_header.ar_op = htons(type);
+
+  ArpPacketHeader arp(&arp_header);
+  arp.update_src_mac(src_mac);
+  arp_header.ar_sip = src_ip;
+
+  arp.update_dst_mac(dst_mac);
+  arp_header.ar_tip = dst_ip;
+
+  Packet arp_packet(sizeof(sr_ethernet_hdr_t));
+
+  memcpy(arp_packet.data(), &arp_header, sizeof(sr_ethernet_hdr_t));
+
+  return arp_packet;
+}

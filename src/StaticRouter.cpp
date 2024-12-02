@@ -30,32 +30,47 @@ void StaticRouter::handlePacket(std::vector<uint8_t> packet,
     spdlog::error("Packet is too small to contain an Ethernet header.");
     return;
   }
+  EthPacketHeader eth(packet);
 
   spdlog::info("Received packet on interface: {}", iface);
   spdlog::info("Packet size: {}", packet.size());
-
-  EthPacketHeader eth(packet);
-
   eth.print_header();
+  spdlog::info("Handling Packet");
 
-  spdlog::info("Hnadling Packet");
+  // * Handle packet lgoic
 
   if (eth.get_type() == sr_ethertype::ethertype_arp) {
-    ArpPacketHeader arp(packet);
-
-    if (arp.get_type() == sr_arp_opcode::arp_op_request) {
-      handle_incoming_arp_request(packet, iface);
-    } else if (arp.get_type() == sr_arp_opcode::arp_op_reply) {
-      spdlog::info("TODO: Implement replies for arp");
-      return;
-    }
+    handle_arp(packet, iface);
+  } else if (eth.get_type() == sr_ethertype::ethertype_ip) {
   }
-
-  return;
 }
 
-void StaticRouter::handle_incoming_arp_request(Packet packet,
-                                               std::string iface) {
+void StaticRouter::handle_ip(Packet packet, const std::string &iface) {
+
+  /*
+
+    We have a few type of ip requests to our interface
+
+  */
+}
+
+void StaticRouter::handle_arp(Packet packet, const std::string &iface) {
+  ArpPacketHeader arp(packet);
+
+  switch (arp.get_type()) {
+  case sr_arp_opcode::arp_op_request:
+    handle_arp_request(packet, iface);
+    break;
+  case sr_arp_opcode::arp_op_reply:
+    handle_arp_reply(packet, iface);
+    break;
+  default:
+    spdlog::warn("Unknown ARP operation type.");
+    break;
+  }
+}
+
+void StaticRouter::handle_arp_request(Packet packet, const std::string &iface) {
   EthPacketHeader eth(packet);
   ArpPacketHeader arp(packet);
 
@@ -76,64 +91,8 @@ void StaticRouter::handle_incoming_arp_request(Packet packet,
   packetSender->sendPacket(packet, iface);
 }
 
-// auto mac_addr = make_mac_addr(ethr->ether_dhost);
-//   for (int i = 0; i < mac_addr.size(); i++) {
-//     std::cout << std::hex << (int)mac_addr[i] << ":";
-//   }
-
-/*
-  So we have just received a packet on an interface
-  We need to figure out what to do with it.
-
-  - Lets focus on Packet Validiation first
-      - Check if the packet is valid using the checksum
-      - If the TTL is 0, we just drop it
-
-
-  - Decrement TTL by 1 somewhere
-
-
-  - ARP stuff to deterimine where ot send it if we need to send it
-  - Decrement TTL
-  - Determine if we need to forward the packet or if it is destined for this
-machine
-
-  - ARP stuff to deterimine where ot send it if we need to send it
-
-
-Questions:
-- DO we decrement TTL If we are the destination?
-
-
-*/
-
-// if (packet_type == sr_ethertype::ethertype_ip) {
-
-//   sr_ip_hdr_t *ipr =
-//       (sr_ip_hdr_t *)(packet.data() + sizeof(sr_ethernet_hdr_t));
-
-//   print_hdr_ip((uint8_t *)(ipr));
-
-//   std::cout << "HAVE NOT IMPLEMENTED THIS YET\n";
-
-// } else if (packet_type == sr_ethertype::ethertype_arp) {
-
-//   sr_arp_hdr_t *arp =
-//       (sr_arp_hdr_t *)(packet.data() + sizeof(sr_ethernet_hdr_t));
-
-//   ARP_Packet_Header arp_header(arp);
-
-//   print_hdr_arp((uint8_t *)&(arp_header.packet()));
-
-//   arp_header.convert_to_host_order();
-
-//   print_hdr_arp((uint8_t *)&(arp_header.packet()));
-
-//   // Extract the ARP operation type
-//   uint16_t arp_type = ntohs(arp->ar_op);
-
-//   // Log or process the ARP type as needed
-//   spdlog::info("ARP operation type: {}", arp_type);
-
-//   ETH_Packet eth(packet);
-// }
+void StaticRouter::handle_arp_reply(Packet packet, const std::string &iface) {
+  EthPacketHeader eth(packet);
+  ArpPacketHeader arp(packet);
+  arpCache->addEntry(arp.get_sender_ip(), arp.get_sender_mac());
+}

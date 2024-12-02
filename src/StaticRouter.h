@@ -10,6 +10,8 @@
 #include "IRoutingTable.h"
 #include "RouterTypes.h"
 
+#include "Helper.h"
+
 class StaticRouter {
 public:
   StaticRouter(std::unique_ptr<IArpCache> arpCache,
@@ -32,7 +34,13 @@ private:
 
   std::unique_ptr<IArpCache> arpCache;
 
-  void handle_incoming_arp_request(Packet packet, std::string iface);
+  void handle_ip(Packet packet, const std::string &iface);
+
+  void handle_arp(Packet packet, const std::string &iface);
+
+  void handle_arp_request(Packet packet, const std::string &iface);
+
+  void handle_arp_reply(Packet packet, const std::string &iface);
 };
 
 #endif // STATICROUTER_H
