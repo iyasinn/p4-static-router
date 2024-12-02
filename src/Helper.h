@@ -1,10 +1,14 @@
+#ifndef HELPER_H_INCLUDED
+#define HELPER_H_INCLUDED
+
 #include "RouterTypes.h"
 #include "protocol.h"
 #include "spdlog/spdlog.h"
 #include "utils.h"
 // #include <_types/_uint8_t.h>
-#include <_types/_uint16_t.h>
-#include <_types/_uint8_t.h>
+// #include <_types/_uint16_t.h>
+// #include <_types/_uint8_t.h>
+
 #include <array>
 #include <cstdint>
 #include <iostream>
@@ -131,9 +135,14 @@ private:
 
 class ICMPPacket {
 public:
-  enum class Type { T0, T3, T11 };
+  enum class Type { T0 = 0, T3 = 3, T11 = 11 };
 
-  enum class Code { Zero, NetUnreachable, HostUnreachable, PortUnreachable };
+  enum class Code {
+    Zero = 0,
+    NetUnreachable = 1,
+    HostUnreachable = 2,
+    PortUnreachable = 3
+  };
 
   ICMPPacket(Type type, Code code, std::vector<uint8_t> data_in = {}) {
 
@@ -245,37 +254,38 @@ inline Packet create_ethernet_packet(mac_addr src_mac, mac_addr dst_mac,
 }
 
 /*
-
-
   Type 0 - Response to an Echo request ping to the oruter interfacece
+
   Type 3 Code 1 - 7 unreachable arp requests
+
   Type 3 Code 0 - NOn eexisten torute no matching entry in routing table
   Type 3 Code 0 - No matching entry in routing table when forwarding ip packet
   Type 11 code 0  - IP packet discard because the TTL field is 0
 
   Type 8 0 - Echo request?
-
 */
-inline Packet create_ip_packet(ip_addr src_ip, ip_addr dst_ip, uint8_t protocol,
-                               Packet data, uint8_t ttl = 64) {
-  sr_ip_hdr_t ip_header;
 
-  ip_header.ip_tos = 0;
-  ip_header.ip_len = htons(data.size() + sizeof(sr_ip_hdr_t));
-  ip_header.ip_id = htons(0);
-  ip_header.ip_off = htons(IP_DF); // Don't fragment
-  ip_header.ip_ttl = ttl;
-  ip_header.ip_p = protocol;
-  ip_header.ip_src = src_ip;
-  ip_header.ip_dst = dst_ip;
-  ip_header.ip_sum = 0; // Checksum calculated by router
+// inline Packet create_ip_packet(ip_addr src_ip, ip_addr dst_ip, uint8_t
+// protocol,
+//                                Packet data, uint8_t ttl = 64) {
+//   sr_ip_hdr_t ip_header;
 
-  Packet packet(sizeof(sr_ip_hdr_t) + data.size());
-  memcpy(packet.data(), &ip_header, sizeof(sr_ip_hdr_t));
-  memcpy(packet.data() + sizeof(sr_ip_hdr_t), data.data(), data.size());
+//   ip_header.ip_tos = 0;
+//   ip_header.ip_len = htons(data.size() + sizeof(sr_ip_hdr_t));
+//   ip_header.ip_id = htons(0);
+//   ip_header.ip_off = htons(IP_DF); // Don't fragment
+//   ip_header.ip_ttl = ttl;
+//   ip_header.ip_p = protocol;
+//   ip_header.ip_src = src_ip;
+//   ip_header.ip_dst = dst_ip;
+//   ip_header.ip_sum = 0; // Checksum calculated by router
 
-  return packet;
-}
+//   Packet packet(sizeof(sr_ip_hdr_t) + data.size());
+//   memcpy(packet.data(), &ip_header, sizeof(sr_ip_hdr_t));
+//   memcpy(packet.data() + sizeof(sr_ip_hdr_t), data.data(), data.size());
+
+//   return packet;
+// }
 
 // Creates an arp request
 inline Packet create_arp_packet(mac_addr src_mac, ip_addr src_ip,
@@ -285,7 +295,7 @@ inline Packet create_arp_packet(mac_addr src_mac, ip_addr src_ip,
   sr_arp_hdr_t arp_header;
 
   arp_header.ar_hrd = htons(sr_arp_hrd_fmt::arp_hrd_ethernet);
-  arp_header.ar_pro = htons(sr_ethertype::ethertype_arp);
+  arp_header.ar_pro = htons(sr_ethertype::ethertype_ip);
   arp_header.ar_hln = ETHER_ADDR_LEN;
   // arp_header.ar_pln = sr_ip_hdr().ip_hl;
   arp_header.ar_pln = 4;
@@ -299,9 +309,11 @@ inline Packet create_arp_packet(mac_addr src_mac, ip_addr src_ip,
   arp.update_dst_mac(dst_mac);
   arp_header.ar_tip = dst_ip;
 
-  Packet arp_packet(sizeof(sr_ethernet_hdr_t));
+  Packet arp_packet(sizeof(sr_arp_hdr_t));
 
-  memcpy(arp_packet.data(), &arp_header, sizeof(sr_ethernet_hdr_t));
+  memcpy(arp_packet.data(), &arp_header, sizeof(sr_arp_hdr_t));
 
   return arp_packet;
 }
+
+#endif // ARPCACHE_H

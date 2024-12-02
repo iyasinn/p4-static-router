@@ -4,24 +4,24 @@
 
 #include "protocol.h"
 
-uint16_t cksum (const void *_data, int len) {
-  const uint8_t *data = static_cast<const uint8_t*>(_data);
+uint16_t cksum(const void *_data, int len) {
+  const uint8_t *data = static_cast<const uint8_t *>(_data);
   uint32_t sum;
 
-  for (sum = 0;len >= 2; data += 2, len -= 2)
+  for (sum = 0; len >= 2; data += 2, len -= 2)
     sum += data[0] << 8 | data[1];
   if (len > 0)
     sum += data[0] << 8;
   while (sum > 0xffff)
     sum = (sum >> 16) + (sum & 0xffff);
-  sum = htons (~sum);
+  sum = htons(~sum);
   return sum ? sum : 0xffff;
 }
 
 /* Converts a MAC address from void* to mac_addr */
-mac_addr make_mac_addr(void* addr) {
+mac_addr make_mac_addr(void *addr) {
   mac_addr mac;
-  uint8_t* ptr = static_cast<uint8_t*>(addr);
+  uint8_t *ptr = static_cast<uint8_t *>(addr);
   for (size_t i = 0; i < ETHER_ADDR_LEN; ++i) {
     mac[i] = ptr[i];
   }
@@ -29,18 +29,18 @@ mac_addr make_mac_addr(void* addr) {
   return mac;
 }
 
-uint16_t ethertype(uint8_t* buf) {
-  sr_ethernet_hdr_t* ehdr = (sr_ethernet_hdr_t*)buf;
+uint16_t ethertype(uint8_t *buf) {
+  sr_ethernet_hdr_t *ehdr = (sr_ethernet_hdr_t *)buf;
   return ntohs(ehdr->ether_type);
 }
 
-uint8_t ip_protocol(uint8_t* buf) {
-  sr_ip_hdr_t* iphdr = (sr_ip_hdr_t*)(buf);
+uint8_t ip_protocol(uint8_t *buf) {
+  sr_ip_hdr_t *iphdr = (sr_ip_hdr_t *)(buf);
   return iphdr->ip_p;
 }
 
 /* Prints out formatted Ethernet address, e.g. 00:11:22:33:44:55 */
-void print_addr_eth(uint8_t* addr) {
+void print_addr_eth(uint8_t *addr) {
   int pos = 0;
   uint8_t cur;
   std::string eth_addr;
@@ -64,12 +64,13 @@ void print_addr_ip(struct in_addr address) {
 
 /* Prints out IP address from integer value */
 void print_addr_ip_int(uint32_t ip) {
-  spdlog::info("{}.{}.{}.{}", (ip >> 24) & 0xFF, (ip >> 16) & 0xFF, (ip >> 8) & 0xFF, ip & 0xFF);
+  spdlog::info("{}.{}.{}.{}", (ip >> 24) & 0xFF, (ip >> 16) & 0xFF,
+               (ip >> 8) & 0xFF, ip & 0xFF);
 }
 
 /* Prints out fields in Ethernet header. */
-void print_hdr_eth(uint8_t* buf) {
-  sr_ethernet_hdr_t* ehdr = (sr_ethernet_hdr_t*)buf;
+void print_hdr_eth(uint8_t *buf) {
+  sr_ethernet_hdr_t *ehdr = (sr_ethernet_hdr_t *)buf;
   spdlog::info("ETHERNET header:");
   spdlog::info("\tdestination: ");
   print_addr_eth(ehdr->ether_dhost);
@@ -79,8 +80,8 @@ void print_hdr_eth(uint8_t* buf) {
 }
 
 /* Prints out fields in IP header. */
-void print_hdr_ip(uint8_t* buf) {
-  sr_ip_hdr_t* iphdr = (sr_ip_hdr_t*)(buf);
+void print_hdr_ip(uint8_t *buf) {
+  sr_ip_hdr_t *iphdr = (sr_ip_hdr_t *)(buf);
   spdlog::info("IP header:");
   spdlog::info("\tversion: {}", static_cast<int>(iphdr->ip_v));
   spdlog::info("\theader length: {}", static_cast<int>(iphdr->ip_hl));
@@ -106,8 +107,8 @@ void print_hdr_ip(uint8_t* buf) {
 }
 
 /* Prints out ICMP header fields */
-void print_hdr_icmp(uint8_t* buf) {
-  sr_icmp_hdr_t* icmp_hdr = (sr_icmp_hdr_t*)(buf);
+void print_hdr_icmp(uint8_t *buf) {
+  sr_icmp_hdr_t *icmp_hdr = (sr_icmp_hdr_t *)(buf);
   spdlog::info("ICMP header:");
   spdlog::info("\ttype: {}", icmp_hdr->icmp_type);
   spdlog::info("\tcode: {}", icmp_hdr->icmp_code);
@@ -115,8 +116,8 @@ void print_hdr_icmp(uint8_t* buf) {
 }
 
 /* Prints out fields in ARP header */
-void print_hdr_arp(uint8_t* buf) {
-  sr_arp_hdr_t* arp_hdr = (sr_arp_hdr_t*)(buf);
+void print_hdr_arp(uint8_t *buf) {
+  sr_arp_hdr_t *arp_hdr = (sr_arp_hdr_t *)(buf);
   spdlog::info("ARP header");
   spdlog::info("\thardware type: {}", ntohs(arp_hdr->ar_hrd));
   spdlog::info("\tprotocol type: {}", ntohs(arp_hdr->ar_pro));
@@ -134,7 +135,7 @@ void print_hdr_arp(uint8_t* buf) {
 }
 
 /* Prints out all possible headers, starting from Ethernet */
-void print_hdrs(uint8_t* buf, uint32_t length) {
+void print_hdrs(uint8_t *buf, uint32_t length) {
   /* Ethernet */
   int minlength = sizeof(sr_ethernet_hdr_t);
   if (length < minlength) {
@@ -164,16 +165,14 @@ void print_hdrs(uint8_t* buf, uint32_t length) {
       else
         print_hdr_icmp(buf + sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t));
     }
-  }
-  else if (ethtype == ethertype_arp) {
+  } else if (ethtype == ethertype_arp) {
     /* ARP */
     minlength += sizeof(sr_arp_hdr_t);
     if (length < minlength)
       spdlog::error("Failed to print ARP header, insufficient length");
     else
       print_hdr_arp(buf + sizeof(sr_ethernet_hdr_t));
-  }
-  else {
+  } else {
     spdlog::error("Unrecognized Ethernet Type: {}", ethtype);
   }
 }

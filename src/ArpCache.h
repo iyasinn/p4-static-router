@@ -1,8 +1,8 @@
 #ifndef ARPCACHE_H
 #define ARPCACHE_H
 
-#include <_types/_uint32_t.h>
-#include <_types/_uint8_t.h>
+// #include <_types/_uint32_t.h>
+// #include <_types/_uint8_t.h>
 #include <array>
 #include <chrono>
 #include <memory>
@@ -19,7 +19,9 @@
 #include "RouterTypes.h"
 #include "protocol.h"
 
+// Helper files
 #include "Helper.h"
+#include <cstdint>
 
 class ArpCache : public IArpCache {
 public:
@@ -113,9 +115,13 @@ private:
   void send_all_icmp(uint32_t ip) {
     auto &packets = requests[ip].awaitingPackets;
 
+    // ICMPPacket icmp(ICMPPacket::Type::T3)
+
     if (getEntry(ip) != std::nullopt) {
       while (!packets.empty()) {
         auto packet_metadata = packets.front();
+
+        // Need to generate an ICMP message
         // packetSender->sendPacket(packet_metadata.packet,
         // packet_metadata.iface);
         packets.pop_front();

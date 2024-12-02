@@ -10,8 +10,6 @@
 #include "IRoutingTable.h"
 #include "RouterTypes.h"
 
-#include "Helper.h"
-
 class StaticRouter {
 public:
   StaticRouter(std::unique_ptr<IArpCache> arpCache,

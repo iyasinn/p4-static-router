@@ -81,14 +81,23 @@ void StaticRouter::handle_arp_request(Packet packet, const std::string &iface) {
     return;
   }
 
-  arp.convert_to_reply(interface.ip, interface.mac);
-  eth.update_header_data(interface.mac, arp.get_target_mac(),
-                         sr_ethertype::ethertype_arp);
+  // arp.convert_to_reply(interface.ip, interface.mac);
+  auto apr_packet =
+      create_arp_packet(interface.mac, interface.ip, arp.get_sender_mac(),
+                        arp.header().ar_sip, sr_arp_opcode::arp_op_reply);
+  // eth.update_header_data(interface.mac, arp.get_target_mac(),
+  //  sr_ethertype::ethertype_arp);
+  auto eth_packet =
+      create_ethernet_packet(interface.mac, arp.get_sender_mac(),
+                             sr_ethertype::ethertype_arp, apr_packet);
+
+  ArpPacketHeader random(eth_packet);
+  EthPacketHeader rnadometh(eth_packet);
 
   spdlog::info("Sending ARP packet\n\n");
   eth.print_header();
-  arp.print_header();
-  packetSender->sendPacket(packet, iface);
+  rnadometh.print_header();
+  packetSender->sendPacket(eth_packet, iface);
 }
 
 void StaticRouter::handle_arp_reply(Packet packet, const std::string &iface) {
