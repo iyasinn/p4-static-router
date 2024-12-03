@@ -192,9 +192,17 @@ void StaticRouter::handle_ip(Packet eth_packet, const std::string &iface) {
 
   // Now we need to forward but if ttl is 0 we cant forward
   if (ip.get_ttl() == 0) {
+    // TODO send TTL exceeded 
     spdlog::error("TTL became 0 after decrementing, so we send icmp");
     return;
   }
+  
+  /*
+  In other words, if an IP packet comes in that you:
+  - don't need to forward, initial TTL= 1 is fine. TTL=0 can be ignored. 
+  - need to forward, you should forward if TTL >= 2, send ICMP TTL Exceeded 
+  if TTL=1, and ignore if TTL=0. 
+  */
 
   EthHeaderModifier eth(eth_packet);
   eth.update_src_mac(interface.mac);
