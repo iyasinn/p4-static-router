@@ -162,29 +162,33 @@ void StaticRouter::handle_ip(Packet eth_packet, const std::string &iface) {
   auto interface = routingTable->getRoutingInterface(iface);
 
   if (interface.ip == ip.get_ip_dst()) {
-    // Echo request
+    // Echo request 
     if (ip.get_protocol() == sr_ip_protocol::ip_protocol_icmp){
 
       ICMPPacket curr_packet(eth_packet);
 
       // Now we know we have an ICMP request
 
-      // lets make sure its na echo request 
+      // lets make sure its an echo request 
 
       ICMPPacket icmp(ICMPPacket::Type::T0, ICMPPacket::Code::C0);
   
+      // Make sure we include original data
 
-
-      // Now we need to create an ip packet to send back
+      //TODO: need to create an ip packet (echo reply) to send back to the sending host 
 
     } else if (ip.get_protocol() == sr_ip_protocol::ip_protocol_tcp || ip.get_protocol() == sr_ip_protocol::ip_protocol_udp) {
       spdlog::error("We dont support TCP or UDP");
+      //TODO: send ICMP port unreachable to sending host
     }
     else{
       spdlog::error("Unknown IP protocol");
     }
     return;
   }
+
+  //TODO: For other ICMP messages (i.e. Type 3 and Type 11) that you send, make sure the data 
+  //field is populated correctly with the incoming packet that it is responding to.
 
   // Now we need to forward but if ttl is 0 we cant forward
   if (ip.get_ttl() == 0) {
