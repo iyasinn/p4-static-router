@@ -14,10 +14,12 @@
 #include <iostream>
 #include <iterator>
 
-class ArpHeaderModifier {
+class ArpHeaderModifier
+{
 public:
   ArpHeaderModifier() {}
-  ArpHeaderModifier(Packet &raw_eth_packet) {
+  ArpHeaderModifier(Packet &raw_eth_packet)
+  {
     _arp_packet =
         (sr_arp_hdr_t *)(raw_eth_packet.data() + sizeof(sr_ethernet_hdr_t));
   }
@@ -50,22 +52,26 @@ public:
   ip_addr get_sender_ip() { return _arp_packet->ar_sip; }
   mac_addr get_sender_mac() { return make_mac_addr(_arp_packet->ar_sha); }
 
-  void update_src_mac(const mac_addr &mac) {
+  void update_src_mac(const mac_addr &mac)
+  {
     memcpy(_arp_packet->ar_sha, mac.data(), ETHER_ADDR_LEN);
   }
 
-  void update_dst_mac(const mac_addr &mac) {
+  void update_dst_mac(const mac_addr &mac)
+  {
     memcpy(_arp_packet->ar_tha, mac.data(), ETHER_ADDR_LEN);
   }
 
-  void print_header() {
+  void print_header()
+  {
     std::cout << std::endl;
     print_hdr_arp((uint8_t *)&_arp_packet);
   }
 
   // Converst the ARP packet to a reply packet
   // Assertion: We have a valid Request packet
-  void convert_to_reply(uint32_t new_sender_ip, mac_addr new_sender_mac_addr) {
+  void convert_to_reply(uint32_t new_sender_ip, mac_addr new_sender_mac_addr)
+  {
 
     header().ar_op = htons(sr_arp_opcode::arp_op_reply);
 
@@ -84,11 +90,14 @@ private:
   sr_arp_hdr_t *_arp_packet = nullptr;
 };
 
-class EthHeaderModifier {
+class EthHeaderModifier
+{
 public:
-  EthHeaderModifier(const std::vector<uint8_t> &raw_network_data) {
+  EthHeaderModifier(const std::vector<uint8_t> &raw_network_data)
+  {
 
-    if (raw_network_data.size() < sizeof(sr_ethernet_hdr_t)) {
+    if (raw_network_data.size() < sizeof(sr_ethernet_hdr_t))
+    {
       std::cerr << "Error: <data> does not contain enough bytes for an "
                    "ethernet packet\n";
       exit(1);
@@ -102,25 +111,30 @@ public:
 
   uint16_t get_type() const { return data_type; }
 
-  void update_type(sr_ethertype host_order_type) {
+  void update_type(sr_ethertype host_order_type)
+  {
     _eth_header->ether_type = htons(host_order_type);
   }
 
-  void update_src_mac(const mac_addr &src) {
+  void update_src_mac(const mac_addr &src)
+  {
     memcpy(_eth_header->ether_shost, src.data(), ETHER_ADDR_LEN);
   }
 
-  void update_dst_mac(const mac_addr &dst) {
+  void update_dst_mac(const mac_addr &dst)
+  {
     memcpy(_eth_header->ether_dhost, dst.data(), ETHER_ADDR_LEN);
   }
 
-  void print_header() {
+  void print_header()
+  {
     print_hdr_eth((uint8_t *)_eth_header);
     print_addr_eth((uint8_t *)_eth_header);
   }
 
   // type is in host order
-  void update_header_data(mac_addr src, mac_addr dst, uint16_t type) {
+  void update_header_data(mac_addr src, mac_addr dst, uint16_t type)
+  {
     memcpy(_eth_header->ether_shost, src.data(), ETHER_ADDR_LEN);
     memcpy(_eth_header->ether_dhost, dst.data(), ETHER_ADDR_LEN);
     _eth_header->ether_type = htons(type);
@@ -133,20 +147,30 @@ private:
   uint16_t data_type = 0;
 };
 
-class ICMPPacket {
+class ICMPPacket
+{
 public:
-  enum class Type { T0 = 0, T3 = 3, T11 = 11 };
+  enum class Type
+  {
+    T0 = 0,
+    T3 = 3,
+    T8 = 8,
+    T11 = 11
+  };
 
-  enum class Code {
+  enum class Code
+  {
     C0 = 0,
     C1 = 1,
     C2 = 2,
     C3 = 3
   };
 
-  ICMPPacket(Type type, Code code, std::vector<uint8_t> t3_data_in = {}) {
+  ICMPPacket(Type type, Code code, std::vector<uint8_t> data_in)
+  {
 
-    if (type == Type::T3 && t3_data_in.size() > ICMP_DATA_SIZE) {
+    if (type == Type::T3 && data_in.size() > ICMP_DATA_SIZE)
+    {
       std::cout << "Cannot create\n";
       exit(1);
     }
@@ -154,7 +178,8 @@ public:
     _type = type;
     _code = code;
 
-    if (_type == Type::T3) {
+    if (_type == Type::T3)
+    {
       t3_packet.icmp_type = (uint8_t)type;
       t3_packet.icmp_code = (uint8_t)code;
 
@@ -162,8 +187,10 @@ public:
       t3_packet.unused = htons(0);
 
       memset(t3_packet.data, 0, ICMP_DATA_SIZE);
-      memcpy(t3_packet.data, t3_data_in.data(), ICMP_DATA_SIZE);
-    } else {
+      memcpy(t3_packet.data, data_in.data(), ICMP_DATA_SIZE);
+    }
+    else
+    {
       t_packet.icmp_type = (uint8_t)type;
       t_packet.icmp_code = (uint8_t)code;
     }
@@ -171,26 +198,81 @@ public:
     calculate_checksum();
   }
 
-  void calculate_checksum() {
-    if (_type == Type::T3) {
-      t3_packet.icmp_sum = 0;
+  // Assumes packet has enough space for whatever it has
+  ICMPPacket(Packet eth_packet)
+  {
+    sr_icmp_hdr_t *general =
+        (sr_icmp_hdr_t *)(eth_packet.data() + IP_PACKET_SIZE);
+
+    _type = (Type)general->icmp_type;
+    _code = (Code)general->icmp_code;
+
+    if (general->icmp_type == 3)
+    {
+      t3_packet = *((sr_icmp_t3_hdr_t *)(eth_packet.data() + IP_PACKET_SIZE));
+    }
+    else
+    {
+      t_packet = *((sr_icmp_hdr_t *)(eth_packet.data() + IP_PACKET_SIZE));
+    }
+  }
+
+  void calculate_checksum()
+  {
+    if (_type == Type::T3)
+    {
+      t3_packet.icmp_sum = htons(0);
       t3_packet.icmp_sum = htons(
           cksum(&t3_packet, sizeof(sr_icmp_t3_hdr_t))); // ! dk if this right
-    } else {
-      t_packet.icmp_sum = 0;
+    }
+    else
+    {
+      t_packet.icmp_sum = htons(0);
       t_packet.icmp_sum =
           htons(cksum(&t_packet, sizeof(sr_icmp_hdr_t))); // ! same here
     }
   }
 
-  Packet get_packet() const {
+  bool validate_checksum()
+  {
+    int original_checksum = 0;
+    int calculated_checksum = 0;
+
+    if (_type == Type::T3)
+    {
+      original_checksum = t3_packet.icmp_sum;
+      calculate_checksum();
+      calculated_checksum = t3_packet.icmp_sum;
+      t3_packet.icmp_sum = original_checksum;
+      return original_checksum == calculated_checksum;
+    }
+    else
+    {
+      original_checksum = t_packet.icmp_sum;
+      calculate_checksum();
+      calculated_checksum = t_packet.icmp_sum;
+      t_packet.icmp_sum = original_checksum;
+      return original_checksum == calculated_checksum;
+    }
+  }
+
+  Type get_type()
+  {
+    return _type;
+  }
+
+  Packet get_packet() const
+  {
 
     Packet packet;
 
-    if (_type == Type::T3) {
+    if (_type == Type::T3)
+    {
       packet.resize(sizeof(sr_icmp_t3_hdr_t));
       std::memcpy(packet.data(), &t3_packet, sizeof(sr_icmp_t3_hdr_t));
-    } else {
+    }
+    else
+    {
       packet.resize(sizeof(sr_icmp_hdr_t));
       std::memcpy(packet.data(), &t_packet, sizeof(sr_icmp_hdr_t));
     }
@@ -198,93 +280,44 @@ public:
     return packet;
   }
 
-
-
-  // void convert_to_network_order() {
-  //   // ! dont need to convert type/code fields bc theyre only one byte long
-  //   if (_type == Type::T3) {
-  //     t3_packet.icmp_sum = htons(t3_packet.icmp_sum);
-  //     t3_packet.unused = htons(t3_packet.unused);
-  //     t3_packet.next_mtu = htons(t3_packet.next_mtu);
-  //   } else {
-  //     t_packet.icmp_sum = htons(t_packet.icmp_sum);
-  //   }
-  // }
-
-  // void convert_to_host_order() {
-  //   if (_type == Type::T3) {
-  //     t3_packet.icmp_sum = ntohs(t3_packet.icmp_sum);
-  //     t3_packet.unused = ntohs(t3_packet.unused);
-  //     t3_packet.next_mtu = ntohs(t3_packet.next_mtu);
-  //   } else {
-  //     t_packet.icmp_sum = ntohs(t_packet.icmp_sum);
-  //   }
-  // }
-
 private:
   Type _type;
   Code _code;
-  union {
+  union
+  {
     sr_icmp_hdr_t t_packet;
     sr_icmp_t3_hdr_t t3_packet;
   };
 };
 
-class IPHeaderModifier {
+class IPHeaderModifier
+{
 public:
   IPHeaderModifier() {}
 
-  IPHeaderModifier(const Packet &raw_ethernet_data) {
+  IPHeaderModifier(const Packet &raw_ethernet_data)
+  {
     ip_header =
         (sr_ip_hdr_t *)(raw_ethernet_data.data() + sizeof(sr_ethernet_hdr_t));
   }
 
   IPHeaderModifier(sr_ip_hdr_t *const ip_header_in) : ip_header(ip_header_in) {}
 
-  // void convert_to_host_order() {
-  //   ip_header->ip_len = ntohs(ip_header->ip_len); // Total length of IP
-  //   packet ip_header->ip_id =
-  //       ntohs(ip_header->ip_id); // Identification field for fragmentation
-  //   ip_header->ip_off = ntohs(ip_header->ip_off); // Fragment offset field
-  //   ip_header->ip_sum = ntohs(ip_header->ip_sum); // IP header checksum
-  //   ip_header->ip_src = ntohl(ip_header->ip_src); // Source IP address
-  //   ip_header->ip_dst = ntohl(ip_header->ip_dst); // Destination IP address
-  // }
-
-  // void convert_to_network_order() {
-  //   ip_header->ip_len = htons(ip_header->ip_len); // Total length of IP
-  //   packet ip_header->ip_id =
-  //       htons(ip_header->ip_id); // Identification field for fragmentation
-  //   ip_header->ip_off = htons(ip_header->ip_off); // Fragment offset field
-  //   ip_header->ip_sum = htons(ip_header->ip_sum); // IP header checksum
-  //   ip_header->ip_src = htonl(ip_header->ip_src); // Source IP address
-  //   ip_header->ip_dst = htonl(ip_header->ip_dst); // Destination IP address
-  // }
-
-  // void prepare_for_send() {
-  //   convert_to_network_order();
-  //   calculate_checksum();
-  // }
-  // validates packet's checksum
-  // throws corresponding ICMPException if packet is corrupted
-  bool is_valid_checksum() {
+  bool is_valid_checksum()
+  {
     int original_checksum = ip_header->ip_sum;
+    calculate_checksum();
+    int calculated_checksum = ip_header->ip_sum;
 
-    ip_header->ip_sum = 0; // 0 the checksum before validating - rfc 1071
-    // uint16_t calcd_checksum =
-    //     cksum(ip_header, ip_header->ip_hl * 4); // header len in bytes
-    uint16_t calculated_checksum = cksum(ip_header, sizeof(sr_ip_hdr_t));
-
-    if (calculated_checksum != original_checksum) {
-      return false;
-    }
-
-    return true;
+    // restore our original checksum
+    ip_header->ip_sum = original_checksum;
+    return calculated_checksum == original_checksum;
   }
 
   uint8_t get_ttl() const { return ip_header->ip_ttl; }
 
-  void decrement_ttl() {
+  void decrement_ttl()
+  {
     ip_header->ip_ttl -= 1;
     calculate_checksum();
   }
@@ -298,8 +331,9 @@ public:
   uint8_t get_protocol() { return ip_header->ip_p; }
 
 private:
-  void calculate_checksum() {
-    ip_header->ip_sum = 0;
+  void calculate_checksum()
+  {
+    ip_header->ip_sum = htons(0);
 
     // * If we were using options, then the length would be ip_hl * 4
     ip_header->ip_sum = htons(cksum(ip_header, sizeof(sr_ip_hdr_t)));
@@ -310,14 +344,23 @@ private:
 
 // * ------------------ Helper Generator Functions ------------------ * //
 
-inline mac_addr get_broadcast_mac_addr() {
+inline mac_addr get_broadcast_mac_addr()
+{
   static const uint8_t broadcast_addr[ETHER_ADDR_LEN] = {0xFF, 0xFF, 0xFF,
                                                          0xFF, 0xFF, 0xFF};
   return make_mac_addr((void *)broadcast_addr);
 }
 
+inline mac_addr get_blank_mac_addr()
+{
+  static const uint8_t broadcast_addr[ETHER_ADDR_LEN] = {0x00, 0x00, 0x00,
+                                                         0x00, 0x00, 0x00};
+  return make_mac_addr((void *)broadcast_addr);
+}
+
 inline Packet create_ethernet_packet(mac_addr src_mac, mac_addr dst_mac,
-                                     sr_ethertype type, Packet data) {
+                                     sr_ethertype type, Packet data)
+{
 
   sr_ethernet_hdr_t eth_header;
 
@@ -336,7 +379,8 @@ inline Packet create_ethernet_packet(mac_addr src_mac, mac_addr dst_mac,
 // Creates an arp request
 inline Packet create_arp_packet(mac_addr src_mac, ip_addr src_ip,
                                 mac_addr dst_mac, ip_addr dst_ip,
-                                sr_arp_opcode type) {
+                                sr_arp_opcode type)
+{
 
   sr_arp_hdr_t arp_header;
 
@@ -363,7 +407,8 @@ inline Packet create_arp_packet(mac_addr src_mac, ip_addr src_ip,
 }
 
 inline Packet create_ip_packet(ip_addr src_ip, ip_addr dst_ip, uint8_t protocol,
-                               uint16_t ttl, const Packet &payload) {
+                               uint16_t ttl, const Packet &payload)
+{
   // Step 1: Construct the IP header
   sr_ip_hdr_t ip_header;
   memset(&ip_header, 0, sizeof(sr_ip_hdr_t)); // Clear the memory
@@ -373,13 +418,13 @@ inline Packet create_ip_packet(ip_addr src_ip, ip_addr dst_ip, uint8_t protocol,
   ip_header.ip_tos = 0;                      // Type of Service (default 0)
   ip_header.ip_len =
       htons(sizeof(sr_ip_hdr_t) + payload.size()); // Total length
-  ip_header.ip_id = htons(0);  // Identification field (set to 0 for simplicity)
-  ip_header.ip_off = htons(0); // No fragmentation
-  ip_header.ip_ttl = ttl;      // Time-to-live
-  ip_header.ip_p = protocol;   // Protocol (e.g., ICMP, TCP, UDP)
-  ip_header.ip_src = src_ip;   // Source IP address
-  ip_header.ip_dst = dst_ip;   // Destination IP address
-  ip_header.ip_sum = 0;        // Initialize checksum to 0 before calculation
+  ip_header.ip_id = htons(0);                      // Identification field (set to 0 for simplicity)
+  ip_header.ip_off = htons(0);                     // No fragmentation
+  ip_header.ip_ttl = ttl;                          // Time-to-live
+  ip_header.ip_p = protocol;                       // Protocol (e.g., ICMP, TCP, UDP)
+  ip_header.ip_src = src_ip;                       // Source IP address
+  ip_header.ip_dst = dst_ip;                       // Destination IP address
+  ip_header.ip_sum = 0;                            // Initialize checksum to 0 before calculation
 
   // Step 2: Calculate the IP header checksum
   ip_header.ip_sum = htons(cksum(&ip_header, sizeof(sr_ip_hdr_t)));

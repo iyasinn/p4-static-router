@@ -23,7 +23,8 @@
 #include "Helper.h"
 #include <cstdint>
 
-class ArpCache : public IArpCache {
+class ArpCache : public IArpCache
+{
 public:
   ArpCache(std::chrono::milliseconds timeout,
            std::shared_ptr<IPacketSender> packetSender,
@@ -55,10 +56,12 @@ private:
   std::unordered_map<ip_addr, ArpEntry> entries;
   std::unordered_map<ip_addr, ArpRequest> requests;
 
-  std::optional<std::string> get_iface(uint32_t ip) {
+  std::optional<std::string> get_iface(uint32_t ip)
+  {
 
     auto entry = routingTable->getRoutingEntry(ip);
-    if (entry == std::nullopt) {
+    if (entry == std::nullopt)
+    {
       return std::nullopt;
     }
     return entry->iface;
@@ -67,14 +70,15 @@ private:
   // Sends an arp request for ip. If not exist, create it. Then send.
   // Assumes that there is no arp failure in the system
   // Returns false if we fail to send an arp
-  bool send_arp_request(uint32_t ip, std::string iface_name) {
+  bool send_arp_request(uint32_t ip, std::string iface_name)
+  {
 
     auto &request = requests[ip];
 
     auto iface = routingTable->getRoutingInterface(iface_name);
 
     Packet arp_packet =
-        create_arp_packet(iface.mac, iface.ip, mac_addr(), request.ip,
+        create_arp_packet(iface.mac, iface.ip, get_blank_mac_addr(), request.ip,
                           sr_arp_opcode::arp_op_request);
 
     Packet ethernet_packet =
@@ -87,12 +91,15 @@ private:
     return true;
   }
 
-  void send_all_packets(uint32_t ip) {
+  void send_all_packets(uint32_t ip)
+  {
 
     auto &packets = requests[ip].awaitingPackets;
 
-    if (getEntry(ip) != std::nullopt) {
-      while (!packets.empty()) {
+    if (getEntry(ip) != std::nullopt)
+    {
+      while (!packets.empty())
+      {
         auto packet_metadata = packets.front();
         packetSender->sendPacket(packet_metadata.packet, packet_metadata.iface);
         packets.pop_front();
@@ -101,7 +108,8 @@ private:
   }
 
   // checks if arp has failed our conditions and send icmp
-  bool check_if_arp_failed(uint32_t ip) {
+  bool check_if_arp_failed(uint32_t ip)
+  {
 
     auto &request = requests[ip];
 
@@ -112,13 +120,16 @@ private:
            (curr_time - request.lastSent) > one_second;
   }
 
-  void send_all_icmp(uint32_t ip) {
+  void send_all_icmp(uint32_t ip)
+  {
     auto &packets = requests[ip].awaitingPackets;
 
     // ICMPPacket icmp(ICMPPacket::Type::T3)
 
-    if (getEntry(ip) != std::nullopt) {
-      while (!packets.empty()) {
+    if (getEntry(ip) != std::nullopt)
+    {
+      while (!packets.empty())
+      {
         auto packet_metadata = packets.front();
 
         // Need to generate an ICMP message
@@ -132,13 +143,15 @@ private:
   // Adds an awaiting packet. If the request entry does not exist, then we
   // create it
   void add_awaiting_packet(uint32_t ip, const Packet &packet,
-                           std::string iface) {
+                           std::string iface)
+  {
 
     auto packet_metadata = AwaitingPacket();
     packet_metadata.packet = packet;
     packet_metadata.iface = iface;
 
-    if (!requests.count(ip)) {
+    if (!requests.count(ip))
+    {
       auto min_time = std::chrono::steady_clock::time_point::min();
       requests[ip] = {ip, min_time, 0, {}};
     }

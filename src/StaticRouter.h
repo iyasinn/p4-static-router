@@ -10,7 +10,8 @@
 #include "IRoutingTable.h"
 #include "RouterTypes.h"
 
-class StaticRouter {
+class StaticRouter
+{
 public:
   StaticRouter(std::unique_ptr<IArpCache> arpCache,
                std::shared_ptr<IRoutingTable> routingTable,
@@ -33,6 +34,8 @@ private:
   std::unique_ptr<IArpCache> arpCache;
 
   void handle_ip(Packet packet, const std::string &iface);
+
+  void handle_ip_for_us(Packet packet, std::string &entry_iface, RoutingInterface target_interface);
 
   void handle_arp(Packet packet, const std::string &iface);
 

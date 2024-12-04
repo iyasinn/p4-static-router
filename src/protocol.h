@@ -69,7 +69,22 @@
 
 /* Structure of a ICMP header
  */
-struct sr_icmp_hdr {
+// struct sr_icmp_hdr {
+//   uint8_t icmp_type;
+//   uint8_t icmp_code;
+//   uint16_t icmp_sum;
+
+// } __attribute__((packed));
+// typedef struct sr_icmp_hdr sr_icmp_hdr_t;
+
+/*
+
+t0: send the icmp header data
+
+*/
+
+struct sr_icmp_hdr
+{
   uint8_t icmp_type;
   uint8_t icmp_code;
   uint16_t icmp_sum;
@@ -79,7 +94,8 @@ typedef struct sr_icmp_hdr sr_icmp_hdr_t;
 
 /* Structure of a type3 ICMP header
  */
-struct sr_icmp_t3_hdr {
+struct sr_icmp_t3_hdr
+{
   uint8_t icmp_type;
   uint8_t icmp_code;
   uint16_t icmp_sum;
@@ -93,7 +109,8 @@ typedef struct sr_icmp_t3_hdr sr_icmp_t3_hdr_t;
 /*
  * Structure of an internet header, naked of options.
  */
-struct sr_ip_hdr {
+struct sr_ip_hdr
+{
 #if __BYTE_ORDER == __LITTLE_ENDIAN
   unsigned int ip_hl : 4; /* header length */
   unsigned int ip_v : 4;  /* version */
@@ -122,7 +139,8 @@ typedef struct sr_ip_hdr sr_ip_hdr_t;
  *  Ethernet packet header prototype.  Too many O/S's define this differently.
  *  Easy enough to solve that and define it here.
  */
-struct sr_ethernet_hdr {
+struct sr_ethernet_hdr
+{
 #ifndef ETHER_ADDR_LEN
 #define ETHER_ADDR_LEN 6
 #endif
@@ -132,27 +150,32 @@ struct sr_ethernet_hdr {
 } __attribute__((packed));
 typedef struct sr_ethernet_hdr sr_ethernet_hdr_t;
 
-enum sr_ip_protocol {
+enum sr_ip_protocol
+{
   ip_protocol_icmp = 0x0001,
   ip_protocol_tcp = 0x0006,
   ip_protocol_udp = 0x0011
 };
 
-enum sr_ethertype {
+enum sr_ethertype
+{
   ethertype_arp = 0x0806,
   ethertype_ip = 0x0800,
 };
 
-enum sr_arp_opcode {
+enum sr_arp_opcode
+{
   arp_op_request = 0x0001,
   arp_op_reply = 0x0002,
 };
 
-enum sr_arp_hrd_fmt {
+enum sr_arp_hrd_fmt
+{
   arp_hrd_ethernet = 0x0001,
 };
 
-struct sr_arp_hdr {
+struct sr_arp_hdr
+{
   unsigned short ar_hrd;                /* format of hardware address   */
   unsigned short ar_pro;                /* format of protocol address   */
   unsigned char ar_hln;                 /* length of hardware address   */
