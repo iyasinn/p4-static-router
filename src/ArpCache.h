@@ -21,10 +21,10 @@
 
 // Helper files
 #include "Helper.h"
+#include "spdlog/spdlog.h"
 #include <cstdint>
 
-class ArpCache : public IArpCache
-{
+class ArpCache : public IArpCache {
 public:
   ArpCache(std::chrono::milliseconds timeout,
            std::shared_ptr<IPacketSender> packetSender,
@@ -56,12 +56,10 @@ private:
   std::unordered_map<ip_addr, ArpEntry> entries;
   std::unordered_map<ip_addr, ArpRequest> requests;
 
-  std::optional<std::string> get_iface(uint32_t ip)
-  {
+  std::optional<std::string> get_iface(uint32_t ip) {
 
     auto entry = routingTable->getRoutingEntry(ip);
-    if (entry == std::nullopt)
-    {
+    if (entry == std::nullopt) {
       return std::nullopt;
     }
     return entry->iface;
@@ -70,8 +68,7 @@ private:
   // Sends an arp request for ip. If not exist, create it. Then send.
   // Assumes that there is no arp failure in the system
   // Returns false if we fail to send an arp
-  bool send_arp_request(uint32_t ip, std::string iface_name)
-  {
+  bool send_arp_request(uint32_t ip, std::string iface_name) {
 
     auto &request = requests[ip];
 
@@ -91,25 +88,59 @@ private:
     return true;
   }
 
-  void send_all_packets(uint32_t ip)
-  {
+  void send_all_packets(uint32_t ip) {
 
     auto &packets = requests[ip].awaitingPackets;
 
-    if (getEntry(ip) != std::nullopt)
-    {
-      while (!packets.empty())
-      {
-        auto packet_metadata = packets.front();
-        packetSender->sendPacket(packet_metadata.packet, packet_metadata.iface);
-        packets.pop_front();
+    auto gateway_mac_addr = entries[ip].mac;
+    auto gateway_ip = ip;
+
+    auto entry = routingTable->getRoutingEntry(gateway_ip);
+    auto interface = routingTable->getRoutingInterface(entry->iface);
+
+    while (!packets.empty()) {
+
+      auto packet_metadata = packets.front();
+      EthHeaderModifier eth(packet_metadata.packet);
+      IPHeaderModifier ip_hdr(packet_metadata.packet);
+
+      ip_hdr.decrement_ttl();
+
+      eth.update_src_mac(interface.mac);
+      eth.update_dst_mac(gateway_mac_addr);
+
+      spdlog::info("TICK FUNCTION: SENDING PACKET");
+      eth.print_header();
+      ip_hdr.print_header();
+      packetSender->sendPacket(packet_metadata.packet, packet_metadata.iface);
+      packets.pop_front();
+      spdlog::info("\n\n");
+    }
+  }
+
+  void dump() {
+    spdlog::info("Dumping arp cache entries");
+    for (auto &entry : entries) {
+      spdlog::info("IP: {}", entry.first);
+      spdlog::info("MAC: ");
+      print_addr_eth(entry.second.mac.data());
+      spdlog::info("");
+    }
+    spdlog::info("Dumping arp cache requests");
+    for (auto &request : requests) {
+      spdlog::info("IP: {}", request.first);
+      spdlog::info("Times sent: {}", request.second.timesSent);
+      spdlog::info("Last sent: {}",
+                   request.second.lastSent.time_since_epoch().count());
+      spdlog::info("Awaiting packets: ");
+      for (auto &packet : request.second.awaitingPackets) {
+        spdlog::info("Packet iface: {}", packet.iface);
       }
     }
   }
 
   // checks if arp has failed our conditions and send icmp
-  bool check_if_arp_failed(uint32_t ip)
-  {
+  bool check_if_arp_failed(uint32_t ip) {
 
     auto &request = requests[ip];
 
@@ -120,44 +151,60 @@ private:
            (curr_time - request.lastSent) > one_second;
   }
 
-  void send_all_icmp(uint32_t ip)
-  {
+  void send_all_icmp(uint32_t ip) {
+
     auto &packets = requests[ip].awaitingPackets;
 
-    // ICMPPacket icmp(ICMPPacket::Type::T3)
+    while (!packets.empty()) {
 
-    if (getEntry(ip) != std::nullopt)
-    {
-      while (!packets.empty())
-      {
-        auto packet_metadata = packets.front();
+      auto packet_metadata = packets.front();
+      EthHeaderModifier eth(packet_metadata.packet);
+      IPHeaderModifier ip(packet_metadata.packet);
 
-        // Need to generate an ICMP message
-        // packetSender->sendPacket(packet_metadata.packet,
-        // packet_metadata.iface);
-        packets.pop_front();
+      auto target_ip = ip.get_ip_src();
+      auto target_mac = eth.get_src_mac();
+
+      auto getEntry = routingTable->getRoutingEntry(target_ip);
+      auto iface = routingTable->getRoutingInterface(getEntry->iface);
+
+      Packet original_packet = ip.get_packet_copy();
+      for (int i = IP_PACKET_SIZE;
+           i < IP_PACKET_SIZE + 8; i++) {
+        original_packet.push_back(packet_metadata.packet[i]);
       }
+
+      auto icmp = create_t3_icmp(Type::T3, Code::C1, original_packet);
+      auto ip_packet = create_ip_packet(iface.ip, target_ip,
+                                        sr_ip_protocol::ip_protocol_icmp, icmp);
+      auto eth_packet = create_ethernet_packet(
+          iface.mac, target_mac, sr_ethertype::ethertype_ip, ip_packet);
+
+      spdlog::info("Sending ICMP for failed arp rely");
+      eth.print_header();
+      EthHeaderModifier eth_packett(eth_packet);
+      eth_packett.print_header();
+      packetSender->sendPacket(eth_packet, getEntry->iface);
+      packets.pop_front();
     }
+    spdlog::info("Sent all ICMP for failed arp rely");
   }
 
   // Adds an awaiting packet. If the request entry does not exist, then we
   // create it
-  void add_awaiting_packet(uint32_t ip, const Packet &packet,
-                           std::string iface)
-  {
+  // void add_awaiting_packet(uint32_t ip, const Packet &packet,
+  //                          std::string iface) {
 
-    auto packet_metadata = AwaitingPacket();
-    packet_metadata.packet = packet;
-    packet_metadata.iface = iface;
+  //   auto packet_metadata = AwaitingPacket();
+  //   packet_metadata.packet = packet;
+  //   packet_metadata.iface = iface;
 
-    if (!requests.count(ip))
-    {
-      auto min_time = std::chrono::steady_clock::time_point::min();
-      requests[ip] = {ip, min_time, 0, {}};
-    }
+  //   if (!requests.count(ip)) {
+  //     auto min_time = std::chrono::steady_clock::time_point::min();
+  //     requests[ip] = {ip, min_time, 0, {}};
+  //   }
 
-    requests[ip].awaitingPackets.push_back(packet_metadata);
-  }
+  //   requests[ip].awaitingPackets.push_back(packet_metadata);
+  // }
 };
 
 #endif // ARPCACHE_H

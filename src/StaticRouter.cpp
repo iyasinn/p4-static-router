@@ -1,5 +1,6 @@
 #include "StaticRouter.h"
 
+#include <cstddef>
 #include <cstdint>
 // #include <_types/_uint16_t.h>
 // #include <_types/_uint8_t.h>
@@ -7,6 +8,7 @@
 #include <spdlog/spdlog.h>
 
 #include "IRoutingTable.h"
+#include "RouterTypes.h"
 #include "protocol.h"
 #include "utils.h"
 
@@ -15,6 +17,7 @@
 // Our libraries
 #include "Helper.h"
 #include <string>
+#include <vector>
 
 StaticRouter::StaticRouter(std::unique_ptr<IArpCache> arpCache,
                            std::shared_ptr<IRoutingTable> routingTable,
@@ -23,39 +26,42 @@ StaticRouter::StaticRouter(std::unique_ptr<IArpCache> arpCache,
       arpCache(std::move(arpCache)) {}
 
 void StaticRouter::handlePacket(std::vector<uint8_t> packet,
-                                std::string iface)
-{
+                                std::string iface) {
   std::unique_lock lock(mutex);
 
-  spdlog::info("\n\nHandle packet invoked");
+  try {
+    spdlog::info("\n\nHandle packet invoked");
 
-  if (packet.size() < sizeof(sr_ethernet_hdr_t))
-  {
-    spdlog::error("Packet is too small to contain an Ethernet header.");
-    return;
+    if (packet.size() < sizeof(sr_ethernet_hdr_t)) {
+      spdlog::error("Packet is too small to contain an Ethernet header.");
+      return;
+    }
+    EthHeaderModifier eth(packet);
+
+    spdlog::info("Received packet on interface: {}", iface);
+    spdlog::info("Packet size: {}", packet.size());
+    eth.print_header();
+    spdlog::info("Handling Packet");
+
+    // * Handle packet lgoic
+
+    if (eth.get_type() == sr_ethertype::ethertype_arp) {
+      handle_arp(packet, iface);
+    } else if (eth.get_type() == sr_ethertype::ethertype_ip) {
+      handle_ip(packet, iface);
+    }
+  } catch (const std::exception &e) {
+    spdlog::info("Encountered an error");
+    spdlog::info("Error in handlePacket: {}", e.what());
+    spdlog::error("Error in handlePacket: {}", e.what());
   }
-  EthHeaderModifier eth(packet);
-
-  spdlog::info("Received packet on interface: {}", iface);
-  spdlog::info("Packet size: {}", packet.size());
-  eth.print_header();
-  spdlog::info("Handling Packet");
-
-  // * Handle packet lgoic
-
-  if (eth.get_type() == sr_ethertype::ethertype_arp)
-  {
-    handle_arp(packet, iface);
-  }
-  else if (eth.get_type() == sr_ethertype::ethertype_ip)
-  {
-  }
+  spdlog::info("Handle Packet Done\n");
+  spdlog::info("------------------------------------\n");
 }
 
 // * ------------------ Handle ARP Packets ------------------ * //
 
-void StaticRouter::handle_arp(Packet packet, const std::string &iface)
-{
+void StaticRouter::handle_arp(Packet packet, const std::string &iface) {
   ArpHeaderModifier arp(packet);
 
   spdlog::info("Handling Arp packet");
@@ -64,14 +70,12 @@ void StaticRouter::handle_arp(Packet packet, const std::string &iface)
 
   int size_for_arp = packet.size() - sizeof(sr_ethernet_hdr_t);
 
-  if (size_for_arp < sizeof(sr_arp_hdr_t))
-  {
+  if (size_for_arp < sizeof(sr_arp_hdr_t)) {
     spdlog::error("ARP packet is too small to contain an ARP header.");
     return;
   }
 
-  switch (arp.get_type())
-  {
+  switch (arp.get_type()) {
   case sr_arp_opcode::arp_op_request:
     handle_arp_request(packet, iface);
     break;
@@ -85,8 +89,7 @@ void StaticRouter::handle_arp(Packet packet, const std::string &iface)
 }
 
 void StaticRouter::handle_arp_request(Packet raw_eth_packet,
-                                      const std::string &iface)
-{
+                                      const std::string &iface) {
 
   spdlog::info("Handling ARP Request");
 
@@ -95,8 +98,7 @@ void StaticRouter::handle_arp_request(Packet raw_eth_packet,
 
   auto interface = routingTable->getRoutingInterface(iface);
 
-  if (interface.ip != arp.header().ar_tip)
-  {
+  if (interface.ip != arp.header().ar_tip) {
     spdlog::error("ARP packet request not destined for any of our interfaces");
     return;
   }
@@ -121,8 +123,7 @@ void StaticRouter::handle_arp_request(Packet raw_eth_packet,
 }
 
 void StaticRouter::handle_arp_reply(Packet raw_eth_packet,
-                                    const std::string &iface)
-{
+                                    const std::string &iface) {
 
   spdlog::info("Handling ARP Reply");
 
@@ -131,8 +132,7 @@ void StaticRouter::handle_arp_reply(Packet raw_eth_packet,
 
   auto interface = routingTable->getRoutingInterface(iface);
 
-  if (interface.ip != arp.header().ar_tip)
-  {
+  if (interface.ip != arp.header().ar_tip) {
     spdlog::error("ARP packet reply not destined for any of our interfaces");
     return;
   }
@@ -144,145 +144,210 @@ void StaticRouter::handle_arp_reply(Packet raw_eth_packet,
 
 // * ------------------ Handle IP Packets ------------------ * //
 
-void StaticRouter::handle_ip_for_us(Packet packet, std::string &entry_iface, RoutingInterface target_interface)
-{
-  // It's for us, and we know it's gonna be either icmp or udp
+// entry interface is where this came from. Because we are sending back, we send
+// back on entry iface
+void StaticRouter::handle_ip_for_us(Packet packet,
+                                    const std::string &entry_iface,
+                                    RoutingInterface target_interface) {
 
+  EthHeaderModifier eth(packet);
   IPHeaderModifier ip(packet);
 
-  if (ip.get_protocol() == sr_ip_protocol::ip_protocol_icmp)
-  {
-    if (packet.size() < ICMP_PACKET_SIZE)
-    {
+  // We will return through the entry iface
+  auto get_exit_interface = routingTable->getRoutingInterface(entry_iface);
+
+  if (ip.get_protocol() == sr_ip_protocol::ip_protocol_icmp) {
+
+    spdlog::info("Handling ICMP packet for us");
+    print_hdr_icmp(packet.data() + IP_PACKET_SIZE);
+
+    if (packet.size() < ICMP_PACKET_SIZE) {
       spdlog::info("Not enough space for a valid ICMP request packet");
       return;
     }
 
-    ICMPPacket incoming_icmp(packet);
-    if (!incoming_icmp.validate_checksum())
-    {
+    sr_icmp_hdr_t *icmp = (sr_icmp_hdr_t *)(packet.data() + IP_PACKET_SIZE);
+    uint16_t old_checksum = icmp->icmp_sum;
+    icmp->icmp_sum = htons(0);
+    uint16_t new_checksum = cksum(icmp, packet.size() - IP_PACKET_SIZE);
+
+    if (old_checksum != new_checksum) {
       spdlog::info("ICMP Packet has a bad checksum");
       return;
     }
-    // ! Add check for an invalid packet
 
-    if (incoming_icmp.get_type() != ICMPPacket::Type::T8)
-    {
+    ICMP_T_PacketModifier incoming_icmp(packet);
+
+    if (incoming_icmp.get_type() != (uint8_t)Type::T8) {
       spdlog::info("Not a icmp echo request. We can drop");
       return;
     }
+    // ! Better to copy entire packet and modify the fields
+    Packet data_copy =
+        std::vector<uint8_t>(packet.begin() + IP_PACKET_SIZE + 4, packet.end());
 
-    // ICMPPacket echo_reply(ICMPPacket::Type::T0, ICMPPacket::Code::C0);
+    Packet icmp_packet = create_t0_icmp(Type::T0, Code::C0, data_copy);
+    Packet ip_packet =
+        create_ip_packet(target_interface.ip, ip.get_ip_src(),
+                         sr_ip_protocol::ip_protocol_icmp, icmp_packet);
+    Packet eth_packet =
+        create_ethernet_packet(get_exit_interface.mac, eth.get_src_mac(),
+                               sr_ethertype::ethertype_ip, ip_packet);
+
+    print_hdr_icmp(icmp_packet.data());
+    print_hdr_ip(ip_packet.data());
+    print_hdr_eth(eth_packet.data());
+
+    spdlog::info("Sending ICMP echo reply");
+    packetSender->sendPacket(eth_packet, entry_iface);
+  } else if (ip.get_protocol() == sr_ip_protocol::ip_protocol_udp ||
+             ip.get_protocol() == sr_ip_protocol::ip_protocol_tcp) {
+    spdlog::info("Handling TCP UDP Packet for us");
+
+    Packet original_ip_packet = ip.get_packet_copy();
+    // Add the 8 bytes of TCP UDP
+    for (int i = IP_PACKET_SIZE; i < IP_PACKET_SIZE + 8; i++) {
+      original_ip_packet.push_back(packet[i]);
+    }
+
+    Packet icmp_packet = create_t3_icmp(Type::T3, Code::C3, original_ip_packet);
+    Packet ip_packet =
+        create_ip_packet(target_interface.ip, ip.get_ip_src(),
+                         sr_ip_protocol::ip_protocol_icmp, icmp_packet);
+    Packet eth_packet =
+        create_ethernet_packet(get_exit_interface.mac, eth.get_src_mac(),
+                               sr_ethertype::ethertype_ip, ip_packet);
+    spdlog::info("Sending ICMP port unreachable because TCP UDP");
+    print_hdr_eth(eth_packet.data());
+    print_hdr_ip(ip_packet.data());
+    print_hdr_icmp(icmp_packet.data());
+    packetSender->sendPacket(eth_packet, entry_iface);
   }
 }
 
-void StaticRouter::handle_ip(Packet eth_packet, const std::string &iface)
-{
+void StaticRouter::handle_ip(Packet eth_packet, const std::string &iface) {
 
   spdlog::info("Handling IP Packet");
 
   IPHeaderModifier ip(eth_packet);
 
-  if (!ip.is_valid_checksum())
-  {
+  ip.print_header();
+
+  if (!ip.is_valid_checksum()) {
     spdlog::error("Invalid checksum");
     return;
   }
 
-  else if (ip.get_ttl() <= 0)
-  {
+  else if (ip.get_ttl() <= 0) {
     spdlog::error("TTL is 0, so we ignore and drop it");
     return;
   }
 
-  ip.decrement_ttl();
+  // * IP packet is for us
+  for (auto interface : routingTable->getRoutingInterfaces()) {
+    if (interface.second.ip == ip.get_ip_dst()) {
+      spdlog::info("Handling IP packet for us");
+      handle_ip_for_us(eth_packet, iface, interface.second);
+      return;
+    }
+  }
 
+  // * IP packet needs to be routed
   auto entry = routingTable->getRoutingEntry(ip.get_ip_dst());
 
-  if (entry == std::nullopt)
-  {
-    /*
-      Does not match for any entry
-    */
+  // * Nowhere to route this IP packet - Desintaiotn Net unreadhable
+  if (entry == std::nullopt) {
+
+    auto return_interface = routingTable->getRoutingInterface(iface);
+    EthHeaderModifier eth(eth_packet);
+
+    Packet original_ip_packet = ip.get_packet_copy();
+    // Add the 8 bytes of TCP UDP
+    for (int i = IP_PACKET_SIZE; i < IP_PACKET_SIZE + 8; i++) {
+      if (i == eth_packet.size()) {
+        break;
+      }
+      original_ip_packet.push_back(eth_packet[i]);
+    }
+    // destination unreachable
+    // were're sending this back from where it came from
+    Packet new_icmp_packet =
+        create_t3_icmp(Type::T3, Code::C0, original_ip_packet);
+    Packet new_ip_packet =
+        create_ip_packet(return_interface.ip, ip.get_ip_src(),
+                         sr_ip_protocol::ip_protocol_icmp, new_icmp_packet);
+    Packet new_eth_packet =
+        create_ethernet_packet(return_interface.mac, eth.get_src_mac(),
+                               sr_ethertype::ethertype_ip, new_ip_packet);
+
+    spdlog::error(
+        "No entry found for destination IP so destination net unreachable");
+    packetSender->sendPacket(new_eth_packet, iface);
     return;
   }
 
   auto interface = routingTable->getRoutingInterface(iface);
 
   // * Handle types of ip requests for us
-  if (interface.ip == ip.get_ip_dst())
-  {
-    // Only ICMP request we deal with
-    if (ip.get_protocol() == sr_ip_protocol::ip_protocol_icmp)
-    {
+  // if (interface.ip == ip.get_ip_dst()) {
+  //   spdlog::info("Handling IP packet for us");
+  //   handle_ip_for_us(eth_packet, iface, interface);
 
-      ICMPPacket received_packet(eth_packet);
-
-      if (!received_packet.validate_checksum())
-      {
-        spdlog::info("Drop icmp request because invalid checksum");
-        return;
-      }
-
-      // ICMPPacket response_packt(ICMPPacket::Type::T0, ICMPPacket::Code::C0, {});
-
-      // ICMPPacket curr_packet(eth_packet);
-
-      // Now we know we have an ICMP request
-
-      // lets make sure its an echo request
-
-      // ICMPPacket icmp(ICMPPacket::Type::T0, ICMPPacket::Code::C0);
-
-      // Make sure we include original data
-
-      // TODO: need to create an ip packet (echo reply) to send back to the
-      // sending host
-    }
-    else if (ip.get_protocol() == sr_ip_protocol::ip_protocol_tcp ||
-             ip.get_protocol() == sr_ip_protocol::ip_protocol_udp)
-    {
-      spdlog::error("We dont support TCP or UDP");
-      // TODO: send ICMP port unreachable to sending host
-    }
-    else
-    {
-      spdlog::error("Unknown IP protocol");
-    }
-    return;
-  }
-
-  // TODO: For other ICMP messages (i.e. Type 3 and Type 11) that you send, make
-  // sure the data field is populated correctly with the incoming packet that it
-  // is responding to.
-
-  // Now we need to forward but if ttl is 0 we cant forward
-  if (ip.get_ttl() == 0)
-  {
-    // TODO send TTL exceeded
-    spdlog::error("TTL became 0 after decrementing, so we send icmp");
-    return;
-  }
-
-  /*
-  TODO: In other words, if an IP packet comes in that you:
-  - don't need to forward, initial TTL= 1 is fine. TTL=0 can be ignored.
-  - need to forward, you should forward if TTL >= 2, send ICMP TTL Exceeded
-  if TTL=1, and ignore if TTL=0.
-  */
-
-  EthHeaderModifier eth(eth_packet);
-  eth.update_src_mac(interface.mac);
-  arpCache->queuePacket(entry->gateway, eth_packet, entry->iface);
-
-  // * Other method: Not sure if this is better
-  // auto arp_entry = arpCache->getEntry(entry->gateway);
-
-  // // Send it out of the right interface
-  // if (arp_entry == std::nullopt) {
-  //   arpCache->queuePacket(entry->gateway, packet, entry->iface);
-  // } else {
-  //   eth.update_dst_mac(arp_entry.value());
-  //   packetSender->sendPacket(packet, entry->iface);
+  //   return;
   // }
+
+  // Only decrement ttl before sending
+  // ip.decrement_ttl();
+
+  if (ip.get_ttl() == 1) {
+  // if (true){
+    auto return_interface = routingTable->getRoutingInterface(iface);
+    EthHeaderModifier eth(eth_packet);
+
+    Packet original_ip_packet = ip.get_packet_copy();
+    // Add the 8 bytes of TCP UDP
+    for (int i = IP_PACKET_SIZE; i < IP_PACKET_SIZE + 8; i++) {
+      if (i == eth_packet.size()) {
+        break;
+      }
+      original_ip_packet.push_back(eth_packet[i]);
+    }
+    // time exceeded
+    Packet new_icmp_packet =
+        create_t3_icmp(Type::T11, Code::C0, original_ip_packet);
+    Packet new_ip_packet =
+        create_ip_packet(return_interface.ip, ip.get_ip_src(),
+                         sr_ip_protocol::ip_protocol_icmp, new_icmp_packet);
+    Packet new_eth_packet =
+        create_ethernet_packet(return_interface.mac, eth.get_src_mac(),
+                               sr_ethertype::ethertype_ip, new_ip_packet);
+
+    spdlog::info("Timed out");
+    packetSender->sendPacket(new_eth_packet, iface);
+    return;
+  }
+
+  spdlog::info("Forward packet");
+
+  // need to update the eth src and eth mac
+  // we need to decrement as well
+
+  auto entry_mac = arpCache->getEntry(entry->gateway);
+  if (entry_mac != std::nullopt) {
+    EthHeaderModifier eth(eth_packet);
+    eth.update_src_mac(interface.mac);
+    eth.update_dst_mac(entry_mac.value());
+    ip.decrement_ttl();
+    spdlog::info("Sending packet to gateway IMMEDIATELY");
+    eth.print_header();
+    ip.print_header();
+    packetSender->sendPacket(eth_packet, entry->iface);
+    return;
+  } else {
+    arpCache->queuePacket(entry->gateway, eth_packet, entry->iface);
+  }
+
+  spdlog::info("Finished forwaridng a packet");
+
+  return;
 }

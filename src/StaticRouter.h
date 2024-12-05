@@ -33,9 +33,13 @@ private:
 
   std::unique_ptr<IArpCache> arpCache;
 
+  // * ------------------ Handle IP Packets ------------------ * //
+
   void handle_ip(Packet packet, const std::string &iface);
 
-  void handle_ip_for_us(Packet packet, std::string &entry_iface, RoutingInterface target_interface);
+  void handle_ip_for_us(Packet packet, const std::string &entry_iface, RoutingInterface target_interface);
+
+  // * ------------------ Handle ARP Packets ------------------ * //
 
   void handle_arp(Packet packet, const std::string &iface);
 

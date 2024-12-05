@@ -13,7 +13,7 @@ ec2-52-91-246-126.compute-1.amazonaws.com
 
 🔵 AWS Commands
 # Replace the ipv4 address below with AWS ipv4 address
-export AWS_IP="ec2-52-91-246-126.compute-1.amazonaws.com" 
+export AWS_IP="ec2-100-26-41-64.compute-1.amazonaws.com" 
 ssh -i ~/.ssh/eecs489-key-pair.pem -R 6633:localhost:6633 ubuntu@$AWS_IP
 ./run_mininet.sh
 
@@ -22,7 +22,7 @@ ssh -i ~/.ssh/eecs489-key-pair.pem -R 6633:localhost:6633 ubuntu@$AWS_IP
 
 
 🔵 Router commands 
-./staticRouter -r ../rtable 
+./StaticRouter -r ../rtable 
 Depends on which directory we call it from 
 
 
@@ -33,7 +33,12 @@ client ping -c 1 server2
 
 🟣 To see arp table 
 arp -n
+ client sudo tcpdump -n -i client-eth0 &
 
+4294949328
+
+
+https://awsacademy.instructure.com/courses/90631/modules/items/8308236
 
 
 

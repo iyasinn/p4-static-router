@@ -34,19 +34,24 @@ void ArpCache::loop() {
 
 void ArpCache::tick() {
   std::unique_lock lock(mutex);
+
   for (auto &[ip, arp_request] : requests) {
 
+    spdlog::info("ARP Request Check: {}", ip);
+
     // Is it in the cache
-    if (getEntry(ip) != std::nullopt) {
+    if (entries.count(ip)) {
       send_all_packets(ip);
       continue;
     }
 
     if (check_if_arp_failed(ip)) {
+    // if (true){
       send_all_icmp(ip);
       continue;
     }
 
+    // This is the iface we should send out of for the ARP LAN request
     auto iface = get_iface(ip);
 
     // todo: check if this is valid behavior
@@ -54,13 +59,13 @@ void ArpCache::tick() {
     //     send_all_icmp(ip);
     //     continue;
     // }
-
+    // spdlog::info("TICK: Sending ARP request for IP: {}", ip);
     send_arp_request(ip, iface.value());
   }
 
   // remove ARP Requests that dont have any requests
   std::erase_if(requests, [](const auto &req) {
-    return req.second.awaitingPackets.size() > 0;
+    return req.second.awaitingPackets.empty();
   });
 
   // Remove entries that have been in the cache for too long
@@ -99,12 +104,24 @@ void ArpCache::queuePacket(uint32_t ip, const Packet &packet,
                            const std::string &iface) {
   std::unique_lock lock(mutex);
 
-  if (getEntry(ip) != std::nullopt) {
-    EthHeaderModifier eth(packet);
-    eth.update_dst_mac(getEntry(ip).value());
-    packetSender->sendPacket(packet, iface);
-    return;
+  // if (entries.count(ip)) {
+  //   spdlog::info("ARP Cache: Sending packet to IP: {}", ip);
+  //   EthHeaderModifier eth(packet);
+  //   eth.update_dst_mac(entries[ip].mac);
+  //   packetSender->sendPacket(packet, iface);
+  //   return;
+  // }
+
+  // * Gateway ip is ip
+  spdlog::info("Queing a packet for", ip);
+  auto packet_metadata = AwaitingPacket();
+  packet_metadata.packet = packet;
+  packet_metadata.iface = iface;
+
+  if (!requests.count(ip)) {
+    auto min_time = std::chrono::steady_clock::time_point::min();
+    requests[ip] = {ip, min_time, 0, {}};
   }
 
-  add_awaiting_packet(ip, packet, iface);
+  requests[ip].awaitingPackets.push_back(packet_metadata);
 }
