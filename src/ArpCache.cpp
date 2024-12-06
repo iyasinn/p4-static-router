@@ -46,13 +46,6 @@ void ArpCache::tick()
 
     spdlog::info("ARP Request Check: {}", ip);
 
-    // Is it in the cache
-    if (entries.count(ip))
-    {
-      send_all_packets(ip);
-      continue;
-    }
-
     if (!check_one_second_elapsed(ip))
     {
       continue;
@@ -93,6 +86,8 @@ void ArpCache::addEntry(uint32_t ip, const mac_addr &mac)
   entries[ip].ip = ip;
   entries[ip].mac = mac;
   entries[ip].timeAdded = std::chrono::steady_clock::now();
+
+  send_all_packets(ip);
 }
 
 std::optional<mac_addr> ArpCache::getEntry(uint32_t ip)
