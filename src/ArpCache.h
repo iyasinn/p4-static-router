@@ -95,7 +95,6 @@ private:
   {
 
     auto &packets = requests[ip].awaitingPackets;
-
     auto gateway_mac_addr = entries[ip].mac;
     auto gateway_ip = ip;
 

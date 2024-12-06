@@ -321,7 +321,9 @@ void StaticRouter::handle_ip(Packet eth_packet, const std::string &iface)
     return;
   }
 
-  auto interface = routingTable->getRoutingInterface(iface);
+  // * This is the interface for our entry
+  // auto interface = routingTable->getRoutingInterface(iface);
+  auto exit_interface = routingTable->getRoutingInterface(entry->iface);
 
   // * Handle types of ip requests for us
   // if (interface.ip == ip.get_ip_dst()) {
@@ -374,7 +376,7 @@ void StaticRouter::handle_ip(Packet eth_packet, const std::string &iface)
   if (entry_mac != std::nullopt)
   {
     EthHeaderModifier eth(eth_packet);
-    eth.update_src_mac(interface.mac);
+    eth.update_src_mac(exit_interface.mac);
     eth.update_dst_mac(entry_mac.value());
     ip.decrement_ttl();
     spdlog::info("Sending packet to gateway IMMEDIATELY");
